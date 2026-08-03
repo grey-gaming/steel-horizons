@@ -19,9 +19,9 @@ There is no money. Everything is resource-driven — the more materials you coll
 
 You are a **space logistics director**. You don't fly a ship. You:
 - Place stations and factories
-- Assign ship routes
 - Choose what to refine and build
 - Direct research priorities
+- Decide when to expand (build more ships, upgrade stations)
 
 The ships and stations operate autonomously once built — your job is to design the network.
 

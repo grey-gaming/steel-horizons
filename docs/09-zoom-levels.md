@@ -4,26 +4,11 @@ Three discrete zoom bands, not continuous. The camera snaps between them. Each b
 
 ---
 
-## Band 1 — Galaxy Map (V2)
+<!-- V2 Galaxy Map moved to v2-gate-logistics.md -->
 
-**Scale:** Multiple star systems. Gates connect them.
+Three discrete zoom bands, numbered 1–3. Band 2 was previously reserved for the Galaxy Map (V2); in V1 it is unused and the camera snaps directly from Band 1 (System) to Band 3 (Detailed).
 
-**Visible elements:**
-- Star systems as labeled circles
-- Gate lines between systems (drawn like rail lines)
-- Gate signal indicators (green/red dots on lines)
-- System names
-
-**Interaction:**
-- Click a system to zoom into it (Band 2)
-- Click a gate line to inspect gate status
-- No ship or station detail — this is strategic navigation
-
-This band is V2 content. In V1, the view starts at Band 2.
-
----
-
-## Band 2 — System Icon View
+## Band 1 — System Icon View
 
 **Scale:** Single star system. All planets, moons, belts visible.
 
@@ -51,7 +36,7 @@ This band is V2 content. In V1, the view starts at Band 2.
 
 ---
 
-## Band 3 — Detailed View
+## Band 3 — Detailed View (Planet & Station)
 
 Two sub-modes: **Planet View** and **Station View**. Both are at the same zoom level but framed differently.
 
@@ -92,7 +77,6 @@ Between bands, the transition is instant (snap), not animated:
 
 | Transition | Trigger |
 |-----------|---------|
-| Galaxy → System | Click a system |
 | System → Planet | Click a planet |
 | System → Station | Click a station |
 | Planet → System | Click empty space or press zoom-out |
@@ -103,12 +87,12 @@ Between bands, the transition is instant (snap), not animated:
 
 ## What Changes at Each Band
 
-| Feature | Galaxy Map | System Icon | Detailed |
-|---------|-----------|-------------|----------|
-| Planets | System circles | Textured circles | Textured + orbit rings |
-| Stations | Not visible | Sprite icons | Full station visuals + docks |
-| Ships | Not visible | Scaled hull sprites | Detailed hulls with cargo/engine |
-| Route lines | Gate lines only | Colored curved lines | Endpoints at docks |
-| Fog | N/A | Covers unexplored bodies | Cleared where surveyed |
-| Orbit rings | Not visible | Not visible | Visible |
-| Cargo transfers | Not visible | Not visible | Animated particles/items |
+| Feature | Band 1 (System View) | Band 2 (Detailed View) |
+|---------|----------------------|------------------------|
+| Planets | Textured circles | Textured + orbit rings |
+| Stations | Sprite icons | Full station visuals + docks |
+| Ships | Scaled hull sprites | Detailed hulls with cargo/engine |
+| Route lines | Colored curved lines | Endpoints at docks |
+| Fog | Covers unexplored bodies | Cleared where surveyed |
+| Orbit rings | Not visible | Visible |
+| Cargo transfers | Not visible | Animated particles/items |

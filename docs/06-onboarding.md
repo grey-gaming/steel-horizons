@@ -18,14 +18,15 @@ The game opens on the **system map** — top-down view, star at center, massive 
 
 The rest of the system is covered in **fog** — you can see celestial bodies exist but their resource contents are hidden.
 
-Your Station Hub orbits the starting planet (visible on an orbit ring). Two ships docked: a Construction Ship and a Cargo Ship.
+Your Station Hub orbits the starting planet (visible on an orbit ring). One ship docked: a Construction Ship.
 
 ### What the player does
 
 1. **Places a Mining Station** — clicks the starting planet. A survey panel appears showing known surface resources (Metal Ore, Carbon Rich Soil, Silicon Dust — the starting planet is pre-surveyed). Places the Mining Station on an orbit ring. The Construction Ship flies there and builds it. Player watches construction complete and ore start flowing.
-2. **The Cargo Ship acts autonomously** — it sees the Mining Station has ore output and the Station Hub has no ore demand yet. It idles. The player learns that ships self-organize based on station supply and demand.
-3. **Places a Refinery Factory** on an orbit ring near the Station Hub. Configures it: Input = Metal Ore, Output = Metals.
-4. **The refinery starts demanding ore** — the Cargo Ship detects the demand, flies to the Mining Station, loads ore, delivers to the Refinery. The player sees a route line appear automatically (color = steel gray for ore, thin = low throughput).
+2. **Places a Refinery Factory** on an orbit ring near the Station Hub. Configures it: Input = Metal Ore, Output = Metals.
+3. **The refinery starts demanding ore** — but there's no Cargo Ship yet. The player sees demand and supply indicators (red/green) but no route line. Ships are needed to move materials.
+4. **Builds a Cargo Ship** (Courier) at the Station Hub — needs Structural Frame + Drive Assembly + Cargo Module. The Construction Ship is free (done building), so components are available at the Hub. Build time: 30s.
+5. **The Cargo Ship launches and acts autonomously** — it detects the Mining Station's ore output and the Refinery's ore demand, flies to the Mining Station, loads, delivers to the Refinery. The player sees a route line appear automatically (color = steel gray for ore, thin = low throughput).
 
 ### What the player learns
 
@@ -46,9 +47,9 @@ First refinery running, Metals in storage, drone logistics understood.
 
 1. **Builds a Research Station** on an orbit ring. Starts **Advanced Refining** research (costs 200 Metals + 100 Carbon Fiber + 50 Silicon Wafers).
 2. **Builds a Research Ship** (Scout) — needs Structural Frame + Drive Assembly + Research Lab. The Construction Factory isn't built yet — the player builds components manually at the Station Hub using basic materials.
-3. **Sends the Scout to survey the volcanic planet**. The ship flies there along the orbital lane. Travel takes visible time. Fog clears around the volcanic planet as the Scout approaches.
+3. **The Scout autonomously seeks the nearest unexplored body** — the volcanic planet. The ship flies there along the orbital lane. Travel takes visible time. Fog clears around the volcanic planet as the Scout approaches.
 4. **Survey completes** — volcanic planet's resources are revealed: Volcanic Sulfur, Rare Earth Minerals, Crystal Deposits.
-5. **Sends the Scout to survey the ice world**. Fog clears there too. Reveals: Water Ice, Frozen Gases, Carbon Rich Soil.
+5. **The Scout automatically moves on to the next unexplored body** — the ice world. Fog clears there too. Reveals: Water Ice, Frozen Gases, Carbon Rich Soil.
 6. **Builds a second Mining Station** on the volcanic planet for Sulfur. Builds a third Mining Station on the ice world for Water Ice.
 7. **Ships autonomously start routing** Sulfur and Water back to the Hub/Refinery. New route lines appear (yellow for Sulfur, cyan for Water).
 
@@ -74,7 +75,7 @@ Multiple mining operations running on surveyed planets. Research underway. Playe
 3. **Builds a second Cargo Ship** — the first one is busy with ore/sulfur/water routes. More ships = more throughput.
 4. **Starts a second research project** — Structural Engineering (unlocks better hulls and Tier 2 ships).
 5. **Routes Sulfur and Water** to the upgraded refinery. Sees Chemicals and Fuel appear in storage.
-6. **Sends the Scout to survey the gas giant** — finds Helium-3 on the moons. Fog clears around the gas giant.
+6. **The Scout autonomously moves on to survey the gas giant** — finds Helium-3 on the moons. Fog clears around the gas giant.
 
 ### What the player learns
 
@@ -119,7 +120,7 @@ Helium-3 flowing. Alloys and Reactor Rods in production. Player has ships specia
 ### What the player does
 
 1. **Fusion Power completes** — unlocks Power Core component.
-2. **Surveys the asteroid belt** — sends the Scout (or a newly built Surveyor). Fog clears. Reveals bulk Metal Ore, Silicon Dust, and occasional Crystal Deposits.
+2. **The Scout (or a newly built Surveyor) autonomously surveys the asteroid belt**. Fog clears. Reveals bulk Metal Ore, Silicon Dust, and occasional Crystal Deposits.
 3. **Builds an Orbital Mining Station** in the belt (requires Orbital Logistics tech or a Tier 2 Construction Ship).
 4. **Builds a Construction Factory** on an orbit ring — needs Structural Frame + Power Core + Construction Bay. Now the factory starts producing components (Structural Frames, Cargo Modules, Power Cores) from refined goods.
 5. **Builds a Tier 2 Construction Ship** (Constructor) — can build on any terrain, faster.

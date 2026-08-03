@@ -10,19 +10,19 @@ The map is the main interface. Zooming, panning, and selecting are the core inte
 
 ## Zoom Levels
 
-Continuous zoom from **system view** to **station view**:
+Three discrete zoom bands. The camera snaps between them, not smooth-scrolls:
 
 | Zoom Band | What You See |
 |-----------|-------------|
-| **System view** (farthest out) | Full system — star, orbital lanes, planets as labeled circles, route lines, ship icons, fog over unexplored regions |
-| **Planet view** (medium) | A single planet fills more of the view. Orbit rings become visible. Stations appear as icons on rings. Ships become small hull shapes. Route endpoints visible at docks. |
-| **Station view** (closest) | A single station fills the view. Ship hulls detailed. Cargo loading/unloading visible. Logistics panel overlays. |
+| **System Icon View** (farthest out) | Full system — star, orbital lanes, planets as textured circles, route lines, ship hulls at small scale, fog over unexplored regions. Ships are visible as recognizable hull shapes (not dots). |
+| **Planet View** (medium) | Framed on a single planet — orbit rings become visible, stations appear as sprite icons on rings, ship hulls larger with visible silhouette, route endpoints visible at docks. |
+| **Station View** (closest) | Framed on a single station — detailed hulls, cargo loading/unloading visible, logistics panel overlays the view. |
 
-Between these bands, detail fades in progressively — no hard cutoffs. Route lines become thicker and gain arrow animation as you zoom in. Ship icons transition from dots to hull shapes.
+Transition is instant (snap). See `09-zoom-levels.md` for the full transition rules and per-band visibility tables.
 
 ## Fog & Exploration
 
-Unexplored regions of the system are covered by **fog**. Planets and asteroid belts are visible as silhouettes, but their resource contents are hidden. To reveal them, you must send a **Research Ship** to survey.
+Unexplored regions of the system are covered by **fog**. Planets and asteroid belts are visible as silhouettes, but their resource contents are hidden. To reveal them, build a **Research Ship** — it autonomously seeks out unexplored bodies and surveys them.
 
 - Surveyed planets show their resource profile (icons on the planet circle)
 - Surveyed belts show deposit density (scattered dots in the belt region)
@@ -88,11 +88,11 @@ At system view, stations are small shapes. At station view, they expand to show 
 
 | Zoom Level | Ship Appearance |
 |------------|----------------|
-| System view | Small colored dots or arrows — visible as movement on route lines |
-| Planet view | Hull shapes — distinguishable by class (boxy cargo, crane construction, dish research) |
+| System view | Scaled hull sprites — recognizable by silhouette (boxy cargo, crane construction, dish research), ~16-24px size |
+| Planet view | Hull shapes larger — cargo containers visible, crane arm visible, sensor dish visible |
 | Station view | Detailed hull — cargo containers visible, engine glow, docking animation |
 
-Ship class is communicated by silhouette at planet zoom:
+Ship class is communicated by silhouette at all zoom levels:
 
 - **Cargo**: rectangular hull with cargo containers
 - **Construction**: boxy with crane/arm appendages
@@ -115,6 +115,6 @@ Outer regions of the system are inherently darker (less star light), making the 
 | Planet glow | Proportional to distance from star |
 | Fog | Covers unexplored areas — scanning reveals resources |
 | Station placement | Orbit rings around planets |
-| Ship rendering | Dots → hulls → detailed as zoom increases |
+| Ship rendering | Scaled hull sprites at all zoom levels — smaller at system view, larger at detailed view |
 | Cargo colors | Distinct palette, readable at system zoom |
-| Zoom | Continuous, no hard bands — detail fades in progressively |
+| Zoom | Three discrete bands — System Icon, Planet View, Station View. Camera snaps between them |

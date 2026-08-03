@@ -37,6 +37,8 @@ There is no money. Every structure, ship, and research project costs materials. 
 
 Components are complex assemblies of refined goods. They're the final inputs for building ships, stations, factories, and research.
 
+**Bootstrap exception:** A Station Hub (Tier 1) can assemble Tier 1 components (Structural Frame, Cargo Module) at 3× slower rate (1 per 30 ticks). This enables early-game construction before a dedicated Construction Factory is built. All other components require a Construction Factory.
+
 | Component | Requires | Used For |
 |-----------|----------|----------|
 | Structural Frame | Metals + Carbon Fiber | All large construction |
@@ -85,6 +87,28 @@ Raw Resources
 Ships have tiers too. A Tier 1 Cargo Ship carries less, moves slower, and costs fewer/basic components. As you research, you unlock higher-tier versions that are faster, carry more, and need advanced components.
 
 The same applies to stations and factories — higher tiers have more throughput, more slots, and can handle advanced materials.
+
+## Fuel Consumption
+
+Ships consume Fuel during flight. Fuel is produced at Refinery Factories (Frozen Gases + Chemicals → Fuel).
+
+**Fuel rules:**
+- Consumption rate = `distance_traveled × cargo_load × 0.01` fuel units per tick
+- Each ship has a fuel capacity (maxFuel) based on tier — Tier 1: 100, Tier 2: 200, Tier 3: 400, Tier 4: 800
+- Ships auto-refuel at any station with Fuel in its output buffer — this happens during docking, no player action needed
+- Ships always have enough reserve to reach the nearest station (minimum 10% fuel set aside) — no stranding
+- A ship low on fuel prioritizes refueling over new cargo jobs
+- Fuel is stored in the ship, not at stations — stations buffer Fuel for refueling only
+
+## Power
+
+Every station requires a **Power Core** component to operate. Unpowered stations cannot process cargo, extract resources, or run research.
+
+**Power rules:**
+- Power Core is a one-time build cost. It does not consume resources over time — install it once and the station runs indefinitely.
+- Exception: the **Space Gate** requires continuous Reactor Rods or Helium-3 supply to maintain the gate connection. This is a megastructure doing active work, not a standard station.
+- The Space Gate consumes 1 Reactor Rod per 100 ticks while active. If supply stops, the gate remains built but inactive (no inter-system travel).
+- Higher-tier stations have larger power requirements built into their component costs (a Tier 4 Station Hub needs more/better components than a Tier 1 Hub).
 
 ## Logistics Thinking
 

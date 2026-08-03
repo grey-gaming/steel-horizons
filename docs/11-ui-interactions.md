@@ -62,7 +62,7 @@ BUILD STATION — Planet: [Name]
 │ ⚙ Construction Fac  │  [Cost: Frame + Core + Bay]
 │ 🔬 Research Station │  [Cost: Frame + Core + Lab]
 │                     │
-│ Available Slots: 3/6│
+│ Slots: 4/8 total   │
 └─────────────────────┘
 ```
 
@@ -70,7 +70,7 @@ Buildings that are locked (not yet researched) are shown grayed out with the tec
 
 ### Orbit Ring Slots
 
-Each orbit ring has a limited number of slots. Slots are shared between all station types. The player sees how many slots remain. Higher-tier station hubs add more slots.
+Slots are per planet — each planet has a total number of station slots distributed across its orbit rings. Rocky Terran planets have 6-8 total slots across 2-3 rings. The build menu shows "Slots: X/Y total" to track remaining capacity. Higher-tier station hubs don't add more slots — slots are fixed by planet type.
 
 ---
 
@@ -305,4 +305,21 @@ SPACE GATE: Sol Gate
 | Survey | Click planet → "Survey" action | Research ship dispatched |
 | Build Gate | Click gate site → assemble | Gate construction begins |
 
-All interactions are click-based. No drag-to-place, no keyboard shortcuts required. The game is playable with mouse only.
+All interactions are click-based. No drag-to-place is required — the game is playable with mouse only (V1 scope).
+
+### Keyboard Shortcuts (V1)
+
+While mouse-only is the primary input, keyboard shortcuts are provided for power users:
+
+| Key | Action |
+|-----|--------|
+| Space | Toggle pause/resume simulation |
+| Tab | Cycle through stations (open logistics panel) |
+| Esc | Close current panel / deselect |
+| +/- | Zoom in/out (same as scroll) |
+| Arrow keys | Pan map |
+| R | Open Research Tree (if a Research Station is selected) |
+| B | Open Build Menu (at current cursor position) |
+| F | Toggle route density overlay |
+
+Shortcuts are documented in-game and optional — the game never requires keyboard input. Accessibility considerations: all UI text uses high-contrast colors, panel text scales with display settings, and click targets are minimum 32×32px for fat-finger safety.

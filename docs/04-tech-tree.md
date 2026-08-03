@@ -2,7 +2,20 @@
 
 ## Research Mechanics
 
+### Resource Delivery
+
+Research materials are delivered by the drone logistics network automatically:
+
+- When the player starts a research project, the required resources are added to the Research Station's **input buffer** as demand entries.
+- Ships in the network detect this demand and deliver the required materials like any other cargo — no manual routing needed.
+- If the required materials exist anywhere in the network (at station output buffers), ships will transport them to the Research Station.
+- If materials are not yet available (not yet produced or not yet extracted), research stalls. The panel shows a "Materials pending" indicator listing what's missing.
+- Research progress advances only when all required resources are present in the station's input buffer. Resources are consumed incrementally as progress advances, not all upfront.
+- Multiple Research Stations can run different projects simultaneously — each station has its own input buffer and demand list.
+
 Research is done at **Research Stations**. Each station can run one research project at a time. A project costs resources — you feed it raw, refined, or component materials over time until the research completes.
+
+**Research Stations need a Research Ship docked to operate.** The ship provides the computation and lab equipment. If no Research Ship is docked, research stalls even if materials are present. The ship can leave to survey and must return for research to resume.
 
 Key rules:
 - Research consumes resources (they're not returned if you cancel)
@@ -64,13 +77,30 @@ The player starts with these already researched — they can build their first s
 
 Once the Space Gate is built and powered, V1 is complete. The gate opens a route to another star system — that's V2.
 
+## Research Duration
+
+Research progresses at 1 tick per tick (real-time). Each technology has a duration in ticks that determines how long it takes to complete once all resources are delivered.
+
+| Tier | Duration Range | Example |
+|------|---------------|---------|
+| Tier 1 (Early Expansion) | 600–900 ticks (10–15 min) | Advanced Refining: 600 ticks |
+| Tier 2 (Industrial Age) | 900–1,800 ticks (15–30 min) | Factory Automation: 1,200 ticks |
+| Tier 3 (Advanced Construction) | 1,800–3,600 ticks (30–60 min) | Precision Manufacturing: 2,400 ticks |
+| Tier 4 (Space Gate) | 3,600–7,200 ticks (60–120 min) | Gate Construction: 4,800 ticks |
+
+### Research Progress Model
+
+Each tick, a Research Station with sufficient materials increments progress by 1. Progress is stored as `ticksCompleted / totalTicks`. Resources are consumed incrementally at a rate of `totalRequired / totalTicks` per tick — they are not consumed all upfront.
+
+If materials run out mid-research, progress stalls but is not lost. When materials are replenished, progress resumes.
+
 ## Research Costs (Example — how much of what)
 
-| Technology | Example Cost |
-|-----------|-------------|
-| Advanced Refining | 200 Metals + 100 Carbon Fiber + 50 Silicon Wafers |
-| Fusion Power | 150 Metals + 80 Carbon Fiber + 30 Helium-3 |
-| Precision Manufacturing | 500 Alloys + 300 Silicon Wafers + 200 Optics + 100 Power Cores |
+| Technology | Example Cost | Duration |
+|-----------|-------------|---------|
+| Advanced Refining | 200 Metals + 100 Carbon Fiber + 50 Silicon Wafers | 600 ticks |
+| Fusion Power | 150 Metals + 80 Carbon Fiber + 30 Helium-3 | 700 ticks |
+| Precision Manufacturing | 500 Alloys + 300 Silicon Wafers + 200 Optics + 100 Power Cores | 2,400 ticks |
 
 Costs scale with tier. Higher-tier research requires refined goods and components, not just raw materials.
 

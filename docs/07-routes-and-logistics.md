@@ -1,19 +1,8 @@
 # Routes & Logistics — The Core Interaction
 
-## Two Modes of Logistics
+## Logistics Model
 
-Steel Horizons has two fundamentally different logistics systems:
-
-| Mode | Scope | Model | Inspiration |
-|------|-------|-------|-------------|
-| **System Logistics** | Within one star system | Autonomous drones | Factorio logistics bots |
-| **Gate Logistics** | Between star systems (V2) | Track-and-signal network | OpenTTD rail system |
-
----
-
-## Mode 1 — System Logistics (V1)
-
-> **This is the chosen model for V1.** Ships are autonomous drones — you design the station network, ships self-organize supply and demand.
+Ships are autonomous drones — you design the station network, ships self-organize supply and demand. This is the only logistics model in V1. Gate logistics (inter-system travel) is V2 content.
 
 ### How It Works
 
@@ -26,9 +15,29 @@ Ships act like **autonomous drones**. You don't assign routes to individual ship
 3. **No explicit routes** — you set station priorities, not ship paths
 4. **Ships pick the best job** — they evaluate which pending move is shortest/most valuable and do it
 
+### Priority System — Numeric Definition
+
+Each station has a `priority` field (0–100). This influences which supply/demand pair an idle cargo ship selects.
+
+**Job selection algorithm** (simplified):
+
+1. Collect all supply entries (stations with surplus above exportThreshold) and demand entries (stations with demand below demandThreshold).
+2. For each supply–demand pair (S→D) where `supply.resource == demand.resource`, compute a **score**:
+   `score = demand.priority × 2 + supply.priority × 1.5 - distanceCost × 0.5`
+   where `distanceCost = angularDistance × orbitalRadius`.
+3. The ship picks the highest-scoring pair that it can reach within its fuel reserve.
+4. If multiple pairs have equal score, pick the closest one.
+
+**Effect of priority values:**
+- Priority 100 (max): the station's supply/demand is weighted heavily — ships favor it strongly.
+- Priority 50 (default): neutral — ships evaluate based on distance and availability.
+- Priority 0 (min): ships only serve this station if no higher-priority work exists.
+
+Priority does not interrupt ships already in transit — it only affects idle ship job selection. Changing priority triggers a re-scan for currently idle ships only.
+
 ### Station Configuration
 
-Every station and factory has a **logistics panel** with two lists:
+Every station and factory has a **logistics panel** with two lists:...
 
 ```
 [Station: Refinery Alpha]
@@ -49,6 +58,19 @@ Every station and factory has a **logistics panel** with two lists:
 
 Before a celestial body is surveyed, its resource deposits are hidden. No station can be placed, no demand or supply is broadcast. Surveying a body with a Research Ship clears the fog and reveals its resource profile, making those resources available to the logistics network.
 
+### Cargo Transfer Mechanics
+
+When a ship arrives at a station:
+
+- **Cargo transfer is instant (gameplay)** — the ship arrives, cargo moves from ship buffer to station buffer (or vice versa), and the ship departs immediately. There is no gameplay-relevant loading/unloading delay.
+- **Loading/Unloading visual animation** — the ship state machine includes `Loading` and `Unloading` states, but these are purely cosmetic. They control animation playback (cargo containers moving, dock arms extending) for visual feedback. The actual cargo transfer completes in zero game ticks regardless of animation duration.
+- **Animation duration** — a cosmetic loading animation may play for 1–3 seconds of real-time, but the ship is considered "arrived and unloaded" for gameplay purposes the instant it docks. The next job assignment happens immediately; the animation is purely eye candy.
+- The station must have a **free dock** to receive the ship. Dock count (from Station Hub tier) limits how many ships can be at a station simultaneously.
+- If all docks are occupied, arriving ships **queue in a holding pattern** — they orbit the station until a dock frees up. Queued ships do not consume fuel.
+- A ship carries **one cargo type per trip**. Mixed cargo loads are not supported in V1.
+- When a station's output buffer is full, production pauses automatically (backpressure). Ships cannot load cargo from a station with no available output.
+- When a station's input buffer is full and more cargo arrives, the ship queues at the dock until the station processes enough input to free buffer space.
+
 ### Ship Behavior
 
 A ship at idle does this:
@@ -65,6 +87,26 @@ Ships don't need to be told which route to fly — they read the network state a
 - Upgrading ships (faster, larger capacity)
 - Setting station priorities (which stations get served first)
 - Placing stations strategically (shorter trips = more throughput)
+
+### Bottleneck Detection
+
+The simulation monitors throughput between station pairs and detects bottlenecks automatically.
+
+**Detection algorithm:**
+- For each station pair (A→B) where A has persistent surplus of resource X and B has persistent demand:
+  - Measure throughput over the last 600 ticks (10 minutes real-time): `units_delivered / 600`
+  - Compare to A's production rate of X
+  - If throughput < production rate AND the gap persists for 300+ ticks, flag as bottleneck
+
+**Visual indicators:**
+- The route/flow line between A and B pulses red
+- The route inspection panel shows a warning: "Bottleneck detected: supply exceeds route capacity"
+- Suggested fix text: "Add more ships" or "Upgrade ships on this route" or "Increase station priority"
+
+**Advisory only:**
+- Bottlenecks are purely informational. No gameplay penalty for ignoring them.
+- The player can inspect the warning and decide whether to add ships, upgrade, or restructure the network.
+- Multiple bottlenecks can exist simultaneously — each is reported independently on its route line.
 
 ### Visualizing the Network
 
@@ -83,72 +125,7 @@ OpenTTD-style explicit routes work when you have a few vehicles and fixed cargo 
 - Ships handle the **execution** (finding the best route dynamically)
 - The challenge becomes **capacity planning** — do you have enough ships? Are stations placed efficiently?
 
----
-
-## Mode 2 — Gate Logistics (V2 Concept)
-
-### How It Works
-
-Gates are the **fixed infrastructure** connecting star systems. A gate has a destination (another gate in another system). Ships traveling between systems must use a gate — they can't fly interstellar directly.
-
-**Gates act like OpenTTD rail tracks:**
-- Gates have **tracks** (a gate-to-gate connection)
-- Tracks have **signals** to prevent multiple ships using the same gate simultaneously
-- Tracks have **directionality** — some gates are one-way, some bidirectional
-- **Path occupancy** — a gate track is "occupied" while a ship is in transit between systems
-
-### Gate Panel
-
-Clicking a gate shows:
-
-```
-[Gate: Alpha-Gate]
-├── CONNECTIONS
-│   ├── → Beta-Gate [SIGNAL: Green | DIR: One-way out]
-│   └── ↔ Gamma-Gate [SIGNAL: Red | DIR: Bidirectional]
-├── OCCUPANCY
-│   ├── Cargo Ship "Hauler-3" → Beta-Gate (in transit, ETA 45s)
-│   └── Cargo Ship "Freighter-1" ← Gamma-Gate (in transit, ETA 120s)
-├── QUEUE
-│   └── (no waiting ships)
-└── SETTINGS
-    ├── Direction: [One-way out] [One-way in] [Bidirectional]
-    └── Signal type: [Simple] [Block] [Priority]
-```
-
-### Signal Types
-
-| Signal | Behavior | Use Case |
-|--------|----------|----------|
-| **Simple** | Green if gate is idle, red if occupied | Low-traffic gates |
-| **Block** | Green if gate AND destination gate buffer are free | High-traffic gates, prevents destination congestion |
-| **Priority** | Ships can reserve a slot, others wait | High-value cargo needs guaranteed passage |
-
-### Directionality
-
-| Mode | Behavior |
-|------|----------|
-| **One-way out** | Ships can only depart through this gate. Cannot arrive. |
-| **One-way in** | Ships can only arrive through this gate. Cannot depart. |
-| **Bidirectional** | Ships can both depart and arrive. Requires signals to prevent head-on collisions. |
-
-### Path Occupancy
-
-While a ship is using a gate (in transit between systems), the gate track is **occupied**. No other ship can use that specific gate-to-gate connection until the ship arrives at the destination system.
-
-This creates a **gate network** where you must plan capacity:
-- Build multiple gates between busy systems
-- Use one-way pairs (Gate A → B for outbound, Gate C ← B for inbound)
-- Signal priority for time-sensitive cargo
-
-### Visualizing Gate Networks
-
-The inter-system map shows:
-
-- **Gate lines** — drawn between systems like rail lines on OpenTTD
-- **Signal indicators** — colored dots along the line (green/red/yellow)
-- **Ship markers** — icons moving along gate lines during transit
-- **Congestion alerts** — blinking when gates are queued or blocked
+<!-- V2 Gate Logistics moved to v2-gate-logistics.md -->
 
 ---
 
@@ -176,28 +153,6 @@ The primary interaction for managing a station's supply/demand:
 │ SHIPS ASSIGNED: 2                    │
 │ └─ Courier-3 (en route, Metals)      │
 │ └─ Hauler-1 (loading, Metal Ore)     │
-└──────────────────────────────────────┘
-```
-
-### Gate Panel (Inter-System View)
-
-```
-┌──────────────────────────────────────┐
-│ GATE: Alpha Gate                     │
-│ System: Sol                        │
-│                                      │
-│ CONNECTIONS                          │
-│ ───── Beta Gate  [SIG: ●] [→]       │
-│ ───── Gamma Gate [SIG: ●] [↔]       │
-│                                      │
-│ TRANSIT TRAFFIC:                     │
-│ ──▶ Beta Gate: Hauler-3 (45s)       │
-│ ◀── Gamma Gate: Freighter-1 (120s)  │
-│                                      │
-│ QUEUE: (empty)                       │
-│                                      │
-│ DIRECTION: [One-way out] ────────── │
-│ SIGNAL: [Block] ──────────────────  │
 └──────────────────────────────────────┘
 ```
 
