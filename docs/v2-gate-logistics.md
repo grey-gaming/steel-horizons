@@ -1,6 +1,15 @@
+---
+status: Concept
+owner: Product Owner
+last-reviewed: 2026-08-03
+audience: Future design reference
+---
+
 # V2 — Gate Logistics (Future Content)
 
 This document captures the V2 gate logistics design that was stripped from V1 docs. Kept here for future reference when V2 development begins.
+
+**Concept status:** This is a sketch, not a completed V2 design. It does not define gate construction/topology, remote-end creation, travel time, connection versus gate capacity, queue policy, route integration, state models, or conflicting direction settings. Do not treat as an implementation specification. V2 design will be revisited after V1 Gate mechanics are stable.
 
 ## Gate Network Model
 
@@ -64,7 +73,7 @@ The inter-system map shows:
 - **Ship markers** — icons moving along gate lines during transit
 - **Congestion alerts** — blinking when gates are queued or blocked
 
-## Summary (V2 Complete)
+## Summary — Concept Direction (Not a Specification)
 
 The two modes give Steel Horizons a **logistics puzzle at every scale**:
 - **Within a system** (V1): Design the station network and let drones handle the rest.

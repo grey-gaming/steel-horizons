@@ -1,6 +1,32 @@
+---
+status: Draft
+owner: Tech Lead
+last-reviewed: 2026-08-03
+---
+
 # Economy & Resources
 
 There is no money. Every structure, ship, and research project costs materials. The economy is a **resource flow chain** — you extract raw materials, transport them, refine them into components, and use components to build things.
+
+## Starting Inventory
+
+The player starts with a **Starter Kit** — a set of pre-assembled components delivered with the initial Station Hub. This kit provides everything needed to build the first wave of ships and factories without requiring a Construction Factory first:
+
+| Component | Quantity | Purpose |
+|-----------|----------|---------|
+| Structural Frame | 1 | Already installed in the starting Hub |
+| Drive Assembly | 1 | First Cargo Ship / Construction Ship / Research Ship |
+| Research Lab | 1 | First Research Ship |
+| Construction Bay | 1 | First Construction Factory |
+| Power Core | 2 | First Construction Factory + first Research Station |
+| Control System | 1 | First Research Station |
+| Cargo Module | 2 | First Cargo Ship + first Station Hub storage |
+
+These components are pre-assembled and available at the Station Hub's storage when the game begins. The player does not need to build them — they are part of the starting equipment. This ensures the bootstrap sequence is solvable: the player can build the first Cargo Ship, Research Ship, and Construction Factory immediately from starter inventory.
+
+> **Tech gate note:** Structural Frame and Cargo Module are unlocked by **Structural Engineering** and **Cargo Handling** research respectively. The starter inventory provides the first units needed to bootstrap — after those are used, you must research the techs before you can produce more at a Construction Factory or (at slower rate) at the Station Hub.
+
+After the starter inventory is consumed, all additional components must be assembled at a Construction Factory or (at slower rate) at the Station Hub.
 
 ## Resource Tiers
 
@@ -37,7 +63,7 @@ There is no money. Every structure, ship, and research project costs materials. 
 
 Components are complex assemblies of refined goods. They're the final inputs for building ships, stations, factories, and research.
 
-**Bootstrap exception:** A Station Hub (Tier 1) can assemble Tier 1 components (Structural Frame, Cargo Module) at 3× slower rate (1 per 30 ticks). This enables early-game construction before a dedicated Construction Factory is built. All other components require a Construction Factory.
+**Bootstrap exception:** A Station Hub (Tier 1) can assemble all Tier 1 components at 3× slower rate (1 per 30 ticks) after their respective techs are researched. This enables early construction before a dedicated Construction Factory is built. The Tier 1 components are: Structural Frame (requires **Structural Engineering**), Cargo Module (requires **Cargo Handling**), Power Core (requires **Basic Power**), Control System (requires **Basic Control**), Drive Assembly (requires **Factory Automation**), Research Lab (requires **Sensor Systems**), Construction Bay (requires **Structural Engineering**). All other components require a Construction Factory.
 
 | Component | Requires | Used For |
 |-----------|----------|----------|
@@ -96,6 +122,7 @@ Ships consume Fuel during flight. Fuel is produced at Refinery Factories (Frozen
 - Consumption rate = `distance_traveled × cargo_load × 0.01` fuel units per tick
 - Each ship has a fuel capacity (maxFuel) based on tier — Tier 1: 100, Tier 2: 200, Tier 3: 400, Tier 4: 800
 - Ships auto-refuel at any station with Fuel in its output buffer — this happens during docking, no player action needed
+- **Starting fuel:** The starting Construction Ship and Cargo Ship each begin with full fuel tanks (100 fuel for Tier 1 ships). The starting Station Hub contains 200 Fuel in its output buffer for initial refueling.
 - Ships always have enough reserve to reach the nearest station (minimum 10% fuel set aside) — no stranding
 - A ship low on fuel prioritizes refueling over new cargo jobs
 - Fuel is stored in the ship, not at stations — stations buffer Fuel for refueling only

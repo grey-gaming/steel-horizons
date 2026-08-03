@@ -1,3 +1,9 @@
+---
+status: Draft
+owner: Tech Lead
+last-reviewed: 2026-08-03
+---
+
 # Ships, Stations & Factories
 
 ## Ships
@@ -12,8 +18,8 @@ Purpose: Move materials from place to place.
 |------|------|----------|-------|-------------------|---------|
 | 1 | Courier | 50 units | Medium | 1 Frame + 1 Drive + 1 Cargo Module | None |
 | 2 | Hauler | 120 units | Medium | 1 Frame + 1 Drive + 2 Cargo Modules | Better fuel efficiency |
-| 3 | Bulk Carrier | 300 units | Slow | 2 Frames + 2 Drives + 3 Cargo Modules | Can carry any cargo, armored |
-| 4 | Fast Freighter | 100 units | Fast | 1 Frame + 2 Drives + 1 Cargo Module | Rush deliveries, perishable goods |
+|| 3 | Bulk Carrier | 300 units | Slow | 2 Frames + 2 Drives + 3 Cargo Modules | Can carry any cargo, armored (mechanics TBD) |
+| 4 | Fast Freighter | 100 units | Fast | 1 Frame + 2 Drives + 1 Cargo Module | Rush deliveries, perishable goods (mechanics TBD) |
 
 Higher-tier cargo ships can carry more, travel faster, or handle special conditions (long distances, high-gravity planets).
 
@@ -25,7 +31,7 @@ Purpose: Build stations, factories, and the Space Gate. They carry construction 
 |------|------|------------|------|---------|
 | 1 | Builder | Slow | 1 Frame + 1 Drive + 1 Construction Bay | Basic structures only |
 | 2 | Constructor | Medium | 1 Frame + 1 Drive + 1 Construction Bay | Can build on any terrain |
-| 3 | Engineer | Fast | 2 Frames + 2 Drives + 2 Construction Bays | Builds multiple structures at once |
+| 3 | Engineer | Fast | 2 Frames + 2 Drives + 2 Construction Bays | Builds multiple structures at once (mechanics TBD) |
 | 4 | Fabricator | Very Fast | 2 Frames + 2 Drives + 2 Construction Bays | Can build in hazardous zones (asteroid belts, volcanic) |
 
 Construction ships travel to a site, deploy, and build. The player chooses what to build and where — the ship handles the construction.
@@ -39,7 +45,7 @@ Purpose: Survey celestial bodies for resources and unlock research data.
 | 1 | Scout | Slow | 1 Frame + 1 Drive + 1 Research Lab | Basic surface survey |
 | 2 | Surveyor | Medium | 1 Frame + 1 Drive + 1 Research Lab | Deep subsurface scan |
 | 3 | Explorer | Fast | 2 Frames + 2 Drives + 1 Research Lab | Full system mapping, hidden deposits |
-| 4 | Pioneer | Very Fast | 2 Frames + 2 Drives + 2 Research Labs | Can analyze samples for research bonuses |
+| 4 | Pioneer | Very Fast | 2 Frames + 2 Drives + 2 Research Labs | Can analyze samples for research bonuses (mechanics TBD) |
 
 Research ships have two roles: **surveying** (clearing fog on celestial bodies) and **powering research** at Research Stations.
 
@@ -62,16 +68,16 @@ The central station of your network. Every system starts with one.
 
 | Tier | Name | Docks | Storage | Special |
 |------|------|-------|---------|---------|
-| 1 | Waypoint | 2 | 200 units | Basic hub. Can assemble Tier 1 components (Structural Frame, Cargo Module) at 1 per 30 ticks — bootstrapping before a Construction Factory is built. |
+| 1 | Waypoint | 2 | 200 units | Basic hub. Can assemble all Tier 1 components at 1/3 rate (1 per 30 ticks) — bootstrapping before a Construction Factory is built. |
 | 2 | Exchange | 4 | 500 units | Can transfer cargo between ships |
-| 3 | Terminal | 6 | 1,000 units | Automated cargo routing |
-| 4 | Nexus | 8 | 2,000 units | Can coordinate fleet routes |
+| 3 | Terminal | 6 | 1,000 units | Automated cargo routing (mechanics TBD — routing is autonomous drone-based, not station-controlled) |
+| 4 | Nexus | 8 | 2,000 units | Can coordinate fleet routes (mechanics TBD) |
 
-Docks are how many ships can be at the station simultaneously. Storage is how much cargo the station can hold before it needs to be moved out.
+Docks are how many ships can be at the station simultaneously. Storage is the total cargo capacity the station can hold across all resources. Each resource gets a per-buffer `max` that caps its share of the total. The sum of all per-buffer `max` values must not exceed the station's total capacity. If no cap is configured for a resource, it defaults to `totalCapacity / numResourceTypes`. Fuel has a reserved compartment separate from cargo storage (see Fuel rules in 03-economy.md).
 
 ### Mining Station
 
-Extracts raw resources from a celestial body. Must be placed on or in orbit of a planet, moon, or asteroid belt.
+Extracts raw resources from a celestial body. Must be placed in orbit of a planet, moon, or asteroid belt. Stations do not land on surfaces — they float on orbit rings. Surface conditions (gravity, terrain) affect landing/launching only for the Construction Ship delivery animation; gameplay-relevant placement is orbital-only.
 
 | Tier | Name | Output Rate | Storage | Special |
 |------|------|------------|---------|---------|
@@ -93,9 +99,9 @@ Converts raw resources into refined goods.
 | Tier | Name | Input Types | Output Types | Throughput |
 |------|------|------------|-------------|-----------|
 | 1 | Smelter | Metal Ore, Carbon Soil, Silicon Dust | Metals, Carbon Fiber, Silicon Wafers | 1 cycle at a time |
-| 2 | Processor | + Volcanic Sulfur, Water Ice | + Chemicals, Fuel | 2 parallel cycles |
-| 3 | Refinery | + Frozen Gases, Rare Earth Minerals | + Alloys, Optics, Reactor Rods | 3 parallel cycles |
-| 4 | Advanced Refinery | + Crystal Deposits, Helium-3 | + All refined goods at max quality | 4 parallel cycles, quality bonus |
+| 2 | Processor | + Volcanic Sulfur, Water Ice, Frozen Gases | + Chemicals, Fuel | 2 parallel cycles |
+| 3 | Refinery | + Rare Earth Minerals, Crystal Deposits, Helium-3 | + Alloys, Optics, Reactor Rods | 3 parallel cycles |
+| 4 | Advanced Refinery | + All raw resources (all Tier 1 inputs accepted) | + All refined goods at max quality | 4 parallel cycles, quality bonus (mechanics TBD) |
 
 ### Construction Factory
 
@@ -115,11 +121,11 @@ Construction factories are where you produce the components needed for ships, st
 The Space Gate is the V1 victory condition. It's not built in a station — it's a megastructure built at a specific location (usually at the edge of the system, in the fringe lane).
 
 Requirements:
-1. Research **Gate Theory** → **Gate Construction** → **System Bridge**
-2. Build **8 Gate Nodes** at a Construction Factory (Tier 4)
+1. Research **Gate Theory** → **Advanced Fabrication** (unlocks Tier 4 Construction Factory and Tier 4 Fabricator) → **Gate Construction** → **System Bridge**
+2. Build **8 Gate Nodes** at a Tier 4 Construction Factory (Fabrication Yard)
 3. Transport the Gate Nodes to the construction site
 4. Build a **Structural Frame** and **Power Core** and **Control System** at the site
-5. A **Tier 4 Construction Ship** (Fabricator) assembles the Gate over time
+5. A **Tier 4 Fabricator** assembles the Gate over time
 6. Once built, the Gate must be powered — this requires a constant supply of Reactor Rods or Helium-3 fuel
 
 When the Gate activates, the system display changes — a destination route appears to the next star. V1 is complete.

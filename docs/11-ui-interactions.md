@@ -1,3 +1,9 @@
+---
+status: Draft
+owner: Product Owner
+last-reviewed: 2026-08-03
+---
+
 # UI Interactions — How the Player Plays
 
 This document describes the core interactions — what the player clicks, where panels appear, and how information flows. Not technical wireframes, but the player's mental model.
@@ -8,13 +14,13 @@ This document describes the core interactions — what the player clicks, where 
 
 ### Zoom
 
-Three discrete zoom bands. The player zooms in/out with scroll wheel or pinch:
+Three discrete zoom bands (1–3). The player zooms in/out with scroll wheel or pinch:
 
 | Action | Result |
 |--------|--------|
-| Scroll up | Zoom in: System Icon → Detailed View |
-| Scroll down | Zoom out: Detailed View → System Icon View |
-| At Galaxy Map (V2) | Scroll further out enters Galaxy Map |
+| Scroll up | Zoom in: System View (Band 1) → Planet View (Band 2) → Station View (Band 3) |
+| Scroll down | Zoom out: Station View (Band 3) → Planet View (Band 2) → System View (Band 1) |
+| Zoom out at System View | Already at widest zoom — no further zoom-out. Galaxy Map (V2) will add a Band 0 outside the V1 sequence. |
 
 Zoom is centered on the cursor position — if you scroll while hovering over a planet, it zooms into that planet.
 
@@ -24,15 +30,18 @@ Click empty space and drag to pan the map. Panning is unrestricted — you can m
 
 ### Click Behavior
 
-| Click Target | Result |
-|-------------|--------|
-| Planet | Zoom to Planet View (Detailed View framed on that planet) |
-| Station | Zoom to Station View (Detailed View framed on that station) |
-| Ship | Open ship inspection panel (side panel, doesn't zoom) |
-| Route line | Open route inspection panel (shows throughput, cargo type) |
-| Empty space | Deselect everything, close panels |
-| Right-click empty | Context menu: "Build New Station" options |
-| Right-click planet | Context menu: "Survey", "Build Mining Station" |
+Click behavior depends on the current zoom band:
+
+| Current Band | Click Target | Result |
+|-------------|-------------|--------|
+| Any | Planet | Zoom to Band 2 (Planet View framed on that planet) |
+| Any | Station | Zoom to Band 3 (Station View framed on that station) |
+| Any | Ship | Open ship inspection panel (side panel, doesn't zoom) |
+| Any | Route line | Open route inspection panel (shows throughput, cargo type) |
+| Band 2 or 3 | Empty space | Return to Band 1 (System View) |
+| Band 1 | Empty space | Deselect everything, close panels; drag to pan |
+| Any | Right-click empty | Context menu: "Build New Station" options |
+| Band 1 or 2 | Right-click planet | Context menu: "Survey", "Build Mining Station" |
 
 ---
 
@@ -80,7 +89,7 @@ Slots are per planet — each planet has a total number of station slots distrib
 
 1. Player clicks a **Station Hub** or clicks the build button on the station's panel
 2. A **shipyard menu** appears showing available ship types
-3. Player selects a ship type → components are consumed from storage
+3. Player selects a ship type → components are reserved from the station's output buffers. If any component is missing across all station buffers, the order is queued as "Awaiting Materials" and the UI shows which components are needed and their locations.
 4. Construction progress bar appears at the station
 5. When complete, the new ship hull appears docked at the station
 6. The ship automatically begins finding work (drone logistics)
@@ -244,11 +253,13 @@ RESEARCH STATION: Lab Alpha
 
 ### Research Flow
 
-1. Player clicks an available tech → resources are deducted from network storage
-2. The tech starts progressing at the Research Station
-3. Progress bar fills over time (real-time, not instant)
-4. Multiple Research Stations can work on different techs simultaneously
-5. When progress reaches 100%, the tech unlocks and can be used
+1. Player clicks an available tech → resources are reserved from station buffers (not deducted all at once). Demand entries are added to the Research Station's input buffer.
+2. The project enters **AwaitingMaterials** state. Ships deliver materials to the station buffer.
+3. Once all required resources are reserved in the buffer, the project enters **Ready** then **Active**. Resources are consumed incrementally as progress advances.
+4. Progress bar fills over time (real-time, not instant).
+5. Multiple Research Stations can work on different techs simultaneously.
+6. When progress reaches 100%, the tech unlocks and can be used.
+7. **Cancellation**: If the player cancels (via the Cancel/Abandon button), unused reserved resources are returned to the station buffer. Resources already consumed are lost.
 
 ---
 
@@ -307,13 +318,62 @@ SPACE GATE: Sol Gate
 
 All interactions are click-based. No drag-to-place is required — the game is playable with mouse only (V1 scope).
 
-### Keyboard Shortcuts (V1)
+### Error & Blocked States
 
-While mouse-only is the primary input, keyboard shortcuts are provided for power users:
+Every UI action can fail. The game shows the reason and remediation:
+
+| Action | Blocked Condition | UI Feedback |
+|--------|-------------------|-------------|
+| Place station | No available orbit slot | "No free slot on this orbit ring — demolish a station or pick another body" |
+| Place station | No Construction Ship available | "No idle Construction Ship — build one at the Station Hub" |
+| Place station | Missing components | "Components not available: [list of missing] — build more or check supply chain" |
+| Place station | Planet has no slots (gas giant) | "Gas giants have no orbit slots — use moons instead" |
+| Build ship | Missing components | "Components not available: [list of missing]" |
+| Build ship | Shipyard slot full | "Shipyard queue is full — wait for current build to complete" |
+| Build ship | Recipe locked | "Technology required: [tech name] — research this first" |
+| Research tech | No Research Station docked | "A Research Ship must be docked at the Research Station to begin research" |
+| Research tech | Missing resources | "Resources not available: [list of missing]" |
+| Research tech | Tech already completed | "Already researched — technology is unlocked" |
+| Research tech | Tech already in progress | "Already being researched — another project is active for this tech" |
+| Set station priority | Priority out of range | "Priority must be 0–100" |
+| Survey body | No Research Ship available | "No idle Research Ship — build one at the Station Hub" |
+| Survey body | Body already surveyed | "Already surveyed — resources are visible" |
+| Cancel build | Not a valid target | "No active construction at this site" |
+| Cancel research | No active project | "No research in progress to cancel" |
+| Demolish station | Station has docked ships | "Station has docked ships — wait for them to depart or scrap them first" |
+| Demolish station | Station is Hub (last one) | "Cannot demolish the last Station Hub — you need at least one hub for your network" |
+| Scrap ship | Ship is in transit | "Ship is en route — wait for it to dock before scrapping" |
+
+### Recovery Actions
+
+The "always solvable" promise requires that players can undo mistakes. V1 supports these recovery actions:
+
+| Action | Trigger | Behavior |
+|--------|---------|----------|
+| Cancel ship building | Click shipyard order → "Cancel" | Components reserved for that order are released back to station buffers. Progress is lost (no refund of materials already consumed). |
+| Cancel station placement | Click station → "Cancel Construction" | Construction Ship returns to idle. Components delivered to the site are lost (non-refundable — the promise is no *permanent* resource loss, but consumed materials are spent). The orbit slot is freed for reuse. |
+| Cancel research | Research panel → "Abandon" | All resources delivered to that project are lost (no refund). The tech slot becomes available for a new project. |
+| Demolish station | Click station → "Demolish" | Station is removed after a deconstruction timer (30 ticks). Components used to build it are NOT refunded (they were consumed during construction). The orbit slot is freed. |
+| Reclaim ship | Click docked ship → "Scrap" | Ship is removed. Components used to build it are NOT refunded. Crew/automation is abstract — no loss. The shipyard slot is freed. |
+| Change mining target | Click Mining Station → "Set Resource" | Mining output switches to a different resource type from the same body. No construction cost — the station retunes automatically over 10 ticks. |
+
+These actions ensure no permanent deadlock: the player can always tear down, rebuild, and re-route. Only slot availability and component supply limit what can be rebuilt.
+
+## Keyboard Shortcuts (V1)
+
+While mouse-only is the primary input, keyboard shortcuts are provided for power users. Touch input (V2) will require long-press as right-click alternative; V1 is mouse-only.
+
+### Accessibility Notes
+
+- Color is never the sole identifier: route lines use animated dash patterns, resource icons have distinct shapes, and inspection panels show text labels.
+- Keyboard shortcuts supplement mouse-only play: Tab cycles through stations, Enter activates the selected action, Escape closes panels.
+- Hit regions are 32×32 CSS pixels minimum for all clickable elements, including small 4px route dots (invisible hit zone surrounding the dot).
+- Reduced-motion setting (planned) disables pulsing route animations, zoom transitions, and scanning ring effects — all state changes also have non-animated indicators (icon change, label update, color shift).
+- All UI text uses system fonts for OS-level scaling support.
 
 | Key | Action |
 |-----|--------|
-| Space | Toggle pause/resume simulation |
+|| Space | Toggle pause/resume simulation — pause freezes all simulation ticks (ship movement, station processing, construction, research, logistics) but the UI remains interactive for planning and inspection. Research and construction timers do not advance while paused. |
 | Tab | Cycle through stations (open logistics panel) |
 | Esc | Close current panel / deselect |
 | +/- | Zoom in/out (same as scroll) |

@@ -1,3 +1,9 @@
+---
+status: Draft
+owner: Tech Lead
+last-reviewed: 2026-08-03
+---
+
 # Iconography & Textures
 
 ## Texture Generation Pipeline
@@ -162,7 +168,7 @@ All icons are flat colored fills, no gradients. Color follows the cargo palette.
 | Station detailed visuals | 6 | PNG/mesh | TBD |
 | Ship hull sprites | 12 (3 roles × 4 tiers) | PNG with alpha | 256x256 |
 | Cargo icons (materials) | 10 | PNG with alpha | 64x64 |
-| Cargo icons (machines) | 8 | PNG with alpha | 64x64 |
+| Cargo icons (machines) | 9 | PNG with alpha | 64x64 | (3 ships + 5 station types + Space Gate; Orbital Mining Station shares Mining Station icon)
 | Cargo icons (components) | 8 | PNG with alpha | 64x64 |
 | Route line colors | 10 | Defined in code | N/A |
 | Fog overlay | 1 | PNG | 512x512 tileable |

@@ -1,3 +1,9 @@
+---
+status: Draft
+owner: Tech Lead
+last-reviewed: 2026-08-03
+---
+
 # Routes & Logistics — The Core Interaction
 
 ## Logistics Model
@@ -93,20 +99,21 @@ Ships don't need to be told which route to fly — they read the network state a
 The simulation monitors throughput between station pairs and detects bottlenecks automatically.
 
 **Detection algorithm:**
-- For each station pair (A→B) where A has persistent surplus of resource X and B has persistent demand:
-  - Measure throughput over the last 600 ticks (10 minutes real-time): `units_delivered / 600`
-  - Compare to A's production rate of X
-  - If throughput < production rate AND the gap persists for 300+ ticks, flag as bottleneck
+- For each demand station B that is persistently below its input threshold for resource X:
+  - Measure throughput to B for resource X over the last 600 ticks: `units_delivered_to_B_X / 600`
+  - Compare to B's consumption rate of X (from its production/refining cycle rate)
+  - If throughput < consumption rate AND the gap persists for 300+ ticks, flag as bottleneck
+- Bottlenecks are **per destination**, not per origin-destination pair. A station A that splits output across destinations B1, B2, B3 will not be falsely flagged — each destination gets independent throughput measurement.
 
 **Visual indicators:**
-- The route/flow line between A and B pulses red
-- The route inspection panel shows a warning: "Bottleneck detected: supply exceeds route capacity"
-- Suggested fix text: "Add more ships" or "Upgrade ships on this route" or "Increase station priority"
+- The bottleneck station pulses red on the map
+- The station inspection panel shows a warning: "Bottleneck detected: not enough supply reaching this station"
+- Suggested fix text: "Add more ships" or "Upgrade ships on this route" or "Add a closer supply station" or "Increase station priority"
 
 **Advisory only:**
 - Bottlenecks are purely informational. No gameplay penalty for ignoring them.
 - The player can inspect the warning and decide whether to add ships, upgrade, or restructure the network.
-- Multiple bottlenecks can exist simultaneously — each is reported independently on its route line.
+- Multiple bottlenecks can exist simultaneously — each is reported independently on its station panel.
 
 ### Visualizing the Network
 
@@ -125,7 +132,7 @@ OpenTTD-style explicit routes work when you have a few vehicles and fixed cargo 
 - Ships handle the **execution** (finding the best route dynamically)
 - The challenge becomes **capacity planning** — do you have enough ships? Are stations placed efficiently?
 
-<!-- V2 Gate Logistics moved to v2-gate-logistics.md -->
+*(V2 Gate Logistics is documented separately in [v2-gate-logistics.md](./v2-gate-logistics.md).)*
 
 ---
 

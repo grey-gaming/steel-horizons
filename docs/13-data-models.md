@@ -1,3 +1,9 @@
+---
+status: Draft
+owner: Tech Lead
+last-reviewed: 2026-08-03
+---
+
 # Data Models — Core Entity Definitions
 
 This document defines the fields and types for every core game entity. Technical design references these shapes.
@@ -29,6 +35,7 @@ struct Buffer {
   resource: ResourceType
   current: int                // current amount stored
   max: int                    // storage capacity
+  remainder: int              // 0–999 — fractional production accumulator (scaled ×1000)
   demandThreshold: float      // 0.0–1.0 — when input buffer falls below this %, broadcast demand
   exportThreshold: float      // 0.0–1.0 — when output buffer rises above this %, broadcast supply available
 }
@@ -64,19 +71,17 @@ struct Ship {
   position: Position            // { laneId: string, angle: float, altitude: float }
   baseSpeed: float              // base speed from tier (units/tick)
   effectiveSpeed: float         // baseSpeed × laneMultiplier × cargoPenalty — computed each tick
-  laneMultiplier: float         // set by the orbital lane the ship is in (see 12-simulation-foundations.md)
+  laneMultiplier: float         // set by the orbital lane the ship is in (see [12-simulation-foundations.md](./12-simulation-foundations.md))
   cargoType: ResourceType | null
   cargoAmount: int              // current load
   maxCapacity: int              // from tier
   fuel: int                     // current fuel units
+  fuelRemainder: int            // 0–999 — fractional fuel consumption accumulator (scaled ×1000)
   maxFuel: int                  // fuel capacity
   state: ShipState              // Idle | Loading | InTransit | Unloading | Building | Surveying
   job: ShipJob | null
   targetId: string              // station or body the ship is heading to
 }
-
-// Lane multipliers are defined in 12-simulation-foundations.md (Rate Definitions section):
-//   Inner: 1.5×, Habitable: 1.0×, Outer: 0.7×, Fringe: 0.5×
 
 enum ShipState {
   Idle, Loading, InTransit, Unloading, Building, Surveying
@@ -131,7 +136,8 @@ struct CelestialBody {
   type: BodyType                // Planet | Moon | AsteroidBelt
   subtype: PlanetType           // RockyTerran | Volcanic | IceWorld | GasGiant
   laneId: string                // which orbital lane
-  orbitalAngle: float           // position on the lane
+  orbitalAngle: float           // position on the lane (radians)
+  orbitalRadius: float          // radial distance from star (units) — used in travel time calculation
   surveyed: bool                // false → fogged, resources hidden
   surveyDepth: int              // 0=none, 1=surface, 2=subsurface, 3=hidden
   resources: Map<ResourceType, int>  // available deposits (hidden until surveyed)
@@ -145,6 +151,62 @@ enum BodyType {
 
 enum PlanetType {
   RockyTerran, Volcanic, IceWorld, GasGiant
+}
+```
+
+## GameState — Root Aggregate
+
+```struct GameState {
+  tick: int                          // elapsed game ticks
+  schemaVersion: int                 // data model version for migration
+  celestialBodies: CelestialBody[]
+  stations: Station[]
+  ships: Ship[]
+  researchProjects: ResearchProject[]
+  completedTechs: string[]           // tech IDs that have been researched
+  buildOrders: BuildOrder[]          // queued construction at shipyards and sites
+  gateBuildProgress: GateBuild | null
+  logisticsReservations: Reservation[] // active cargo reservations (runtime, serialized for determinism)
+  rngState: RNGState                 // seeded PRNG state for belt drift, etc.
+}
+```
+
+## BuildOrder — Construction Queue Entity
+
+```struct BuildOrder {
+  id: string
+  type: BuildType                   // Ship | Station | Upgrade | GatePhase
+  targetId: string                  // station ID for upgrades, site ID for Gate
+  componentsRequired: Map<ResourceType, int>  // what materials are needed
+  componentsDelivered: Map<ResourceType, int> // what has been delivered so far
+  builderShipId: string | null      // assigned Construction Ship
+  progress: int                     // ticks completed
+  totalTicks: int                   // ticks needed
+  state: BuildState                 // AwaitingMaterials | Delivering | Building | Complete | Cancelled
+}
+
+enum BuildType { Ship, Station, Upgrade, GatePhase }
+
+enum BuildState {
+  AwaitingMaterials, Delivering, Building, Complete, Cancelled
+}
+
+## Reservation — Logistics Runtime
+
+```struct Reservation {
+  id: string
+  shipId: string
+  supplyStationId: string
+  demandStationId: string
+  resource: ResourceType
+  amount: int                       // reserved cargo quantity
+  tickAssigned: int                 // tick when reservation was made (for timeout)
+  tickExpiry: int                   // tick when reservation auto-releases if not used
+}
+
+struct RNGState {
+  seed: int
+  calls: int                        // number of RNG calls made (deterministic replay)
 }
 ```
 

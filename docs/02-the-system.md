@@ -1,3 +1,9 @@
+---
+status: Draft
+owner: Tech Lead
+last-reviewed: 2026-08-03
+---
+
 # The System — Worlds & Geography
 
 ## The Star
@@ -52,6 +58,8 @@ Belt regions contain many small objects. Instead of landing, you build **orbital
 - No gravity concerns — easy to set up
 - **Resource shifting** — every 1,000 ticks (~17 min real-time), each belt resource deposit fluctuates by ±10% of its base amount (random drift). This means a belt that initially has 1,000 units of Metal Ore might have 1,050 after one shift and 980 after the next. The drift is slow and small — it never depletes a resource entirely, but over long play sessions the belt's resource mix changes subtly. Mining stations in the belt automatically adapt: their output rate adjusts proportionally to the remaining deposit fraction.
 
+**Deposit semantics:** The `resources` field on CelestialBody represents the **total extractable quantity** available at that body. For planet and moon deposits, mining consumes this total — each unit extracted decrements the deposit. If a deposit reaches 0, mining at that body ceases for that resource. Belt deposits follow the shifting mechanic above: they never deplete, so their `resources` value represents a baseline that drifts over time rather than a finite quantity. The starting system is authored to guarantee that Gate-critical resources (Alloys, Reactor Rods, Helium-3) are present in sufficient quantity to complete V1, and no soft-lock can occur through depletion alone.
+
 > **Design note:** Belt shifting is a minor background mechanic. It prevents belts from feeling static and gives a slight advantage to players who monitor and adapt. Most players won't notice day-to-day changes, but over a 10-hour session the shift totals ~±30% cumulative drift. No player action is required to benefit — the mining stations handle it automatically.
 
 ## Travel & Logistics (V1 — Autonomous Drone Model)
@@ -72,15 +80,17 @@ The player sees **flow lines** on the map — animated colored lines that appear
 > Explicit route assignment (Origin → Destination → Cargo → Frequency) is **V2 Gate Logistics** for inter-system travel. V1 uses the autonomous drone model only.
 
 ## Key Map Locations
-
 The starting system map should have:
+
 - 1 rocky terran planet in the habitable lane (player start)
 - 1 volcanic planet in the inner lane
 - 1 ice world in the outer lane
-- 1 gas giant with 2 moons in the outer lane
-- 1 asteroid belt in the fringe
+- 1 gas giant with moons in the outer lane
+- 1 asteroid belt between inner and habitable lanes
 
-**Total system station capacity** (V1 starting system):
+Planets have a number of orbit rings and slots per ring, determining how many stations can be placed around each body.
+
+**Note:** The ranges below are for procedural generation (future). For V1, the starting system is **authored** with exact body IDs, radii/angles, slots, deposits, survey depth, names, and starting inventory. See the canonical content catalog (to be created) for the authored system data.
 
 | Body | Type | Total Slots |
 |------|------|------------|

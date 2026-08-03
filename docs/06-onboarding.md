@@ -1,4 +1,10 @@
-# Onboarding — The First 5 Hours
+---
+status: Draft
+owner: Product Owner
+last-reviewed: 2026-08-03
+---
+
+# Onboarding — The First Hour
 
 This document describes what a new player sees, does, and learns during their first session. It defines the experience and pacing so implementation knows what to teach and when.
 
@@ -25,7 +31,7 @@ Your Station Hub orbits the starting planet (visible on an orbit ring). One ship
 1. **Places a Mining Station** — clicks the starting planet. A survey panel appears showing known surface resources (Metal Ore, Carbon Rich Soil, Silicon Dust — the starting planet is pre-surveyed). Places the Mining Station on an orbit ring. The Construction Ship flies there and builds it. Player watches construction complete and ore start flowing.
 2. **Places a Refinery Factory** on an orbit ring near the Station Hub. Configures it: Input = Metal Ore, Output = Metals.
 3. **The refinery starts demanding ore** — but there's no Cargo Ship yet. The player sees demand and supply indicators (red/green) but no route line. Ships are needed to move materials.
-4. **Builds a Cargo Ship** (Courier) at the Station Hub — needs Structural Frame + Drive Assembly + Cargo Module. The Construction Ship is free (done building), so components are available at the Hub. Build time: 30s.
+4. **Builds a Cargo Ship** (Courier) at the Station Hub — needs Structural Frame + Drive Assembly + Cargo Module. These components are available from the Starter Inventory (the pre-assembled components that come with the Hub). Build time: 30s.
 5. **The Cargo Ship launches and acts autonomously** — it detects the Mining Station's ore output and the Refinery's ore demand, flies to the Mining Station, loads, delivers to the Refinery. The player sees a route line appear automatically (color = steel gray for ore, thin = low throughput).
 
 ### What the player learns
@@ -45,13 +51,15 @@ First refinery running, Metals in storage, drone logistics understood.
 
 ### What the player does
 
-1. **Builds a Research Station** on an orbit ring. Starts **Advanced Refining** research (costs 200 Metals + 100 Carbon Fiber + 50 Silicon Wafers).
-2. **Builds a Research Ship** (Scout) — needs Structural Frame + Drive Assembly + Research Lab. The Construction Factory isn't built yet — the player builds components manually at the Station Hub using basic materials.
-3. **The Scout autonomously seeks the nearest unexplored body** — the volcanic planet. The ship flies there along the orbital lane. Travel takes visible time. Fog clears around the volcanic planet as the Scout approaches.
-4. **Survey completes** — volcanic planet's resources are revealed: Volcanic Sulfur, Rare Earth Minerals, Crystal Deposits.
-5. **The Scout automatically moves on to the next unexplored body** — the ice world. Fog clears there too. Reveals: Water Ice, Frozen Gases, Carbon Rich Soil.
-6. **Builds a second Mining Station** on the volcanic planet for Sulfur. Builds a third Mining Station on the ice world for Water Ice.
-7. **Ships autonomously start routing** Sulfur and Water back to the Hub/Refinery. New route lines appear (yellow for Sulfur, cyan for Water).
+1. **Research Sensor Systems** — the tech tree already shows it available: requires Basic Control (already known). Starts research at the Station Hub's built-in research panel (the Hub includes basic research capability for Tier 1 techs before a dedicated Research Station is built). Costs: 100 Silicon Wafers + 50 Optics + 50 Power Cores. The Starter Inventory provides the needed Optics and Power Cores; Silicon Wafers are produced by expanding the Refinery to accept Silicon Dust input (alongside Metal Ore). Similarly, Carbon Fiber comes from processing Carbon Soil — the Refinery needs to handle multiple input types in parallel.
+2. **Sensor Systems completes** — unlocks the Research Ship and Research Station.
+3. **Builds a Research Station** on an orbit ring. Starts **Advanced Refining** research (costs 200 Metals + 100 Carbon Fiber + 50 Silicon Wafers).
+4. **Builds a Research Ship** (Scout) — needs Structural Frame + Drive Assembly + Research Lab. The Research Lab and Drive Assembly are available from the Starter Inventory at the Station Hub.
+5. **The Scout autonomously seeks the nearest unexplored body** — the volcanic planet. The ship flies there along the orbital lane. Travel takes visible time. Fog clears around the volcanic planet as the Scout approaches. During the Scout's absence, Advanced Refining stalls (no Research Ship docked) — but the research panel shows "Waiting for Research Ship" so the player understands the dual-role tension.
+6. **Survey completes** — volcanic planet's resources are revealed: Volcanic Sulfur, Rare Earth Minerals, Crystal Deposits.
+7. **The Scout automatically moves on to the next unexplored body** — the ice world. Fog clears there too. Reveals: Water Ice, Frozen Gases, Carbon Rich Soil.
+8. **Builds a second Mining Station** on the volcanic planet for Sulfur. Builds a third Mining Station on the ice world for Water Ice.
+9. **Ships autonomously start routing** Sulfur and Water back to the Hub/Refinery. New route lines appear (yellow for Sulfur, cyan for Water).
 
 ### What the player learns
 
@@ -99,7 +107,7 @@ Fuel production online. Gas giant moons identified as next expansion target.
 3. **Builds a Mining Station** on a gas giant moon for Helium-3.
 4. **Builds a Tier 2 Cargo Ship** (Hauler) — bigger capacity, better fuel efficiency. The Hauler naturally takes over the long Helium-3 route because it's more efficient for the distance.
 5. **Refinery upgrade produces Alloys** (Metals + Rare Earth Minerals) and **Reactor Rods** (Helium-3 + Rare Earth Minerals). New route lines appear (purple for Alloys, neon green for Reactor Rods).
-6. **Starts third research** — Fusion Power (unlocks Power Core component) or Factory Automation (unlocks Construction Factory).
+6. **Starts third research** — Fusion Power (unlocks Reactor Rods and Tier 2 Hub) or Factory Automation (unlocks Construction Factory).
 7. **Begins stockpiling** Alloys, Reactor Rods, Optics, and other advanced materials.
 
 ### What the player learns
@@ -119,10 +127,10 @@ Helium-3 flowing. Alloys and Reactor Rods in production. Player has ships specia
 
 ### What the player does
 
-1. **Fusion Power completes** — unlocks Power Core component.
+1. **Fusion Power completes** — unlocks Reactor Rods and Tier 2 Hub.
 2. **The Scout (or a newly built Surveyor) autonomously surveys the asteroid belt**. Fog clears. Reveals bulk Metal Ore, Silicon Dust, and occasional Crystal Deposits.
 3. **Builds an Orbital Mining Station** in the belt (requires Orbital Logistics tech or a Tier 2 Construction Ship).
-4. **Builds a Construction Factory** on an orbit ring — needs Structural Frame + Power Core + Construction Bay. Now the factory starts producing components (Structural Frames, Cargo Modules, Power Cores) from refined goods.
+4. **Builds a Tier 2 Construction Factory (Assembly Line)** on an orbit ring — needs Structural Frame + Power Core + Construction Bay. The Assembly Line produces Structural Frames, Cargo Modules, Power Cores, and Control Systems from refined goods. (A Tier 1 Workshop only produces Frames and Cargo Modules — upgrading to Tier 2 unlocks Power Cores and Control Systems.)
 5. **Builds a Tier 2 Construction Ship** (Constructor) — can build on any terrain, faster.
 6. **Builds a Tier 2 Station Hub** — more docks and storage.
 7. **Starts planning the mid-game** — which tech to research next (Sensor Systems for better surveying, Factory Automation for Drive Assembly).

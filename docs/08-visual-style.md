@@ -1,4 +1,10 @@
-# Visual Style — Chosen Direction
+---
+status: Draft
+owner: Tech Lead
+last-reviewed: 2026-08-03
+---
+
+# Visual Style & Direction
 
 ## The Map
 
@@ -10,19 +16,19 @@ The map is the main interface. Zooming, panning, and selecting are the core inte
 
 ## Zoom Levels
 
-Three discrete zoom bands. The camera snaps between them, not smooth-scrolls:
+Three discrete zoom bands (1–3). The camera snaps between them, not smooth-scrolls:
 
 | Zoom Band | What You See |
 |-----------|-------------|
-| **System Icon View** (farthest out) | Full system — star, orbital lanes, planets as textured circles, route lines, ship hulls at small scale, fog over unexplored regions. Ships are visible as recognizable hull shapes (not dots). |
-| **Planet View** (medium) | Framed on a single planet — orbit rings become visible, stations appear as sprite icons on rings, ship hulls larger with visible silhouette, route endpoints visible at docks. |
-| **Station View** (closest) | Framed on a single station — detailed hulls, cargo loading/unloading visible, logistics panel overlays the view. |
+| **Band 1 — System View** (farthest out) | Full system — star, orbital lanes, planets as textured circles, route lines, ship hulls at small scale, fog over unexplored regions. Ships are visible as recognizable hull shapes (not dots). |
+| **Band 2 — Planet View** (medium) | Framed on a single planet — orbit rings become visible, stations appear as sprite icons on rings, ship hulls larger with visible silhouette, route endpoints visible at docks. |
+| **Band 3 — Station View** (closest) | Framed on a single station — detailed hulls, cargo loading/unloading visible, logistics panel overlays the view. |
 
-Transition is instant (snap). See `09-zoom-levels.md` for the full transition rules and per-band visibility tables.
+Transition is instant (snap). See [09-zoom-levels.md](./09-zoom-levels.md) for the full transition rules and per-band visibility tables.
 
 ## Fog & Exploration
 
-Unexplored regions of the system are covered by **fog**. Planets and asteroid belts are visible as silhouettes, but their resource contents are hidden. To reveal them, build a **Research Ship** — it autonomously seeks out unexplored bodies and surveys them.
+Unexplored regions of the system are covered by **fog**. Planets and asteroid belts are visible as silhouettes, but their resource contents are hidden. To reveal them, build a **Research Ship** — the player clicks a body and selects 'Survey', then the ship autonomously flies there and scans. Once dispatched, the ship travels, enters a scanning orbit, and reveals resources after scan time completes.
 
 - Surveyed planets show their resource profile (icons on the planet circle)
 - Surveyed belts show deposit density (scattered dots in the belt region)
@@ -43,20 +49,27 @@ At system view, routes are thin colored lines. At planet view, they thicken and 
 
 ## Cargo Color Palette
 
-| Resource | Color |
-|----------|-------|
-| Metal Ore / Metals | Steel Gray |
-| Carbon Soil / Carbon Fiber | Warm Brown |
-| Silicon Dust / Silicon Wafers | Cool Blue |
-| Volcanic Sulfur / Chemicals | Bright Yellow |
-| Water Ice / Fuel | Ice Cyan |
-| Helium-3 / Reactor Rods | Neon Green |
-| Alloys | Purple |
-| Optics / Sensors | Teal |
-| Rare Earth Minerals | Magenta |
-| Gate Nodes | White / Gold |
+| Resource | Color | Icon Pattern | Label (inspection panel) |
+|----------|-------|-------------|---------------------------|
+| Metal Ore | Steel Gray | Coarse triangle | "Metal Ore" |
+| Metals | Steel Gray | Smooth ingot | "Metals" |
+| Carbon Soil | Warm Brown | Leaf silhouette | "Carbon Soil" |
+| Carbon Fiber | Warm Brown | Fiber strand | "Carbon Fiber" |
+| Silicon Dust | Cool Blue | Scattered dots | "Silicon Dust" |
+| Silicon Wafers | Cool Blue | Solid circle | "Silicon Wafers" |
+| Volcanic Sulfur | Bright Yellow | Rising gas plume | "Volcanic Sulfur" |
+| Chemicals | Bright Yellow | Vial bottle | "Chemicals" |
+| Water Ice | Ice Cyan | Hexagonal snowflake | "Water Ice" |
+| Fuel | Ice Cyan | Flame shape | "Fuel" |
+| Helium-3 | Neon Green | Three-ring atom | "Helium-3" |
+| Reactor Rods | Neon Green | Cylinder bars | "Reactor Rods" |
+| Alloys | Purple | Gear cog | "Alloys" |
+| Optics | Teal | Concentric lens | "Optics" |
+| Rare Earth Minerals | Magenta | Jagged crystal | "Rare Earth Minerals" |
+| Crystal Deposits | Pink | Faceted diamond | "Crystal Deposits" |
+| Gate Nodes | White / Gold | Six-sided hexagon | "Gate Node" |
 
-This palette is distinct enough to read at a glance even at system zoom. Route lines use these colors so you immediately see what cargo is flowing where.
+Colors are shared between raw/refined pairs (e.g., Metal Ore and Metals both use Steel Gray) because they are visually adjacent in the production chain. Each resource is uniquely identified by a combination of color + icon pattern, and the inspection panel shows the full text label. Route lines use color + animated dash pattern for identification. Non-color cues (icon shape, line dash style, text labels) ensure accessibility for color-blind players.
 
 ## Planets
 
@@ -117,4 +130,4 @@ Outer regions of the system are inherently darker (less star light), making the 
 | Station placement | Orbit rings around planets |
 | Ship rendering | Scaled hull sprites at all zoom levels — smaller at system view, larger at detailed view |
 | Cargo colors | Distinct palette, readable at system zoom |
-| Zoom | Three discrete bands — System Icon, Planet View, Station View. Camera snaps between them |
+| Zoom | Three discrete bands — Band 1 (System View), Band 2 (Planet View), Band 3 (Station View). Camera snaps between them |

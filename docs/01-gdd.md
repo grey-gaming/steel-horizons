@@ -1,3 +1,10 @@
+---
+status: Approved
+owner: Product Owner
+last-reviewed: 2026-08-03
+audience: Development team, stakeholders
+---
+
 # Steel Horizons — Game Design Document (GDD)
 
 ## Overview
@@ -33,7 +40,7 @@ The game takes place in **one star system**. The system contains:
 - Moons orbiting some planets
 - Asteroid belts between orbital lanes
 
-The player starts with a single small construction ship and a basic station. The system is partially **fogged** — you can see celestial bodies but their resource contents are hidden until surveyed. Over the course of V1, the player will:
+The player starts with a single small construction ship, a basic station, and a **Starter Kit** of pre-assembled components (Drive Assembly, Research Lab, Construction Bay, Power Cores, Control System, Cargo Modules) that enable building the first ships and factories. The system is partially **fogged** — you can see celestial bodies but their resource contents are hidden until surveyed. Over the course of V1, the player will:
 - Explore and survey the system to reveal resources
 - Establish mining operations on multiple bodies
 - Build a logistics network of cargo ships and stations
