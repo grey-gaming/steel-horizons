@@ -1,7 +1,7 @@
 ---
-status: Draft
-owner: Tech Lead
-last-reviewed: 2026-08-03
+status: Approved
+owner: Product Owner
+last-reviewed: 2026-08-04
 ---
 
 # The System — Worlds & Geography
@@ -19,16 +19,16 @@ Space is divided into **orbital lanes** — concentric rings around the star. Ea
 | Inner | Closest to star | Fast (short orbits) | Small rocky planets |
 | Habitable | Middle zone | Moderate | Larger planets with moons |
 | Outer | Far from star | Slow (long orbits) | Gas giants, many moons |
-| Fringe | Edge of system | Very slow | Asteroid belts, derelicts |
+| Fringe | Edge of system | Very slow | Fixed Space Gate site |
 
-Ships travel along orbital lanes. Moving between lanes requires a "burn" — slower but needed to reach different bodies. A ship's class determines how fast it can move in each lane.
+Ships travel with a deterministic two-segment plan: a half-speed radial burn to the destination radius, followed by the shortest arc in the destination lane. The destination lane's rational multiplier controls arc speed. Bodies are fixed gameplay nodes in V1; orbital motion is cosmetic and cannot change logistics outcomes. GDD 12 owns the exact formula.
 
 ## Planets
 
 Each planet has:
 - **Surface conditions** (rocky, icy, volcanic, gas, etc.)
 - **Resource profile** (which raw resources are present)
-- **Gravity** (affects how easy it is to land and launch)
+- **Gravity/atmosphere flavor** (presentation only in V1; it does not alter travel or throughput)
 - **Station slots** — total slots across all orbit rings (see Orbit Rings below)
 
 ### Example Planet Types
@@ -46,30 +46,27 @@ Each planet has:
 Moons orbit planets. They are smaller than planets and offer:
 - Smaller resource deposits (often 1-2 resource types)
 - 1-2 station slots at most (single orbit ring)
-- Faster to land/launch from (low gravity)
+- Distinct low-gravity visual flavor; V1 has no landing/launch modifier
 
 Moons are good for specialized extraction outposts.
 
 ## Asteroid Belts
 
-Belt regions contain many small objects. Instead of landing, you build **orbital mining stations** that drift with the belt. Belts provide:
-- Bulk common resources (Metals, Carbon, Silicon)
-- Occasional rare finds
-- No gravity concerns — easy to set up
-- **Resource shifting** — every 1,000 ticks (~17 min real-time), each belt resource deposit fluctuates by ±10% of its base amount (random drift). This means a belt that initially has 1,000 units of Metal Ore might have 1,050 after one shift and 980 after the next. The drift is slow and small — it never depletes a resource entirely, but over long play sessions the belt's resource mix changes subtly. Mining stations in the belt automatically adapt: their output rate adjusts proportionally to the remaining deposit fraction.
+Belt regions contain many small objects. The ordinary `Mining` StationType is rendered as an orbital collector when placed there; there is no separate Orbital Mining Station entity. Belts provide:
+- Bulk raw resources (Metal Ore, Carbon Soil, Silicon Dust, Water Ice, Frozen Gases, and Volcanic Sulfur)
+- A renewable Crystal Deposits field revealed at survey depth 2
+- Orbital-collector presentation; setup is gated only by survey depth, a free slot, and Orbital Logistics
+- **Resource shifting** — every 1,000 ticks, each renewable belt density changes by a deterministic seeded amount within ±10% of baseline and is clamped to 70–130%. Mining output scales by current density divided by baseline.
 
-**Deposit semantics:** The `resources` field on CelestialBody represents the **total extractable quantity** available at that body. For planet and moon deposits, mining consumes this total — each unit extracted decrements the deposit. If a deposit reaches 0, mining at that body ceases for that resource. Belt deposits follow the shifting mechanic above: they never deplete, so their `resources` value represents a baseline that drifts over time rather than a finite quantity. The starting system is authored to guarantee that Gate-critical resources (Alloys, Reactor Rods, Helium-3) are present in sufficient quantity to complete V1, and no soft-lock can occur through depletion alone.
+**Deposit semantics:** Planet and moon deposits are finite and decrement by whole extracted units. Belt deposits are renewable density fields and never decrement. Each deposit also has a minimum survey depth. The authored system budgets finite critical resources for every technology plus the Gate, while reversible builds return their components; common construction and fuel inputs remain renewable.
 
-> **Design note:** Belt shifting is a minor background mechanic. It prevents belts from feeling static and gives a slight advantage to players who monitor and adapt. Most players won't notice day-to-day changes, but over a 10-hour session the shift totals ~±30% cumulative drift. No player action is required to benefit — the mining stations handle it automatically.
+> **Design note:** Belt shifting is a minor background mechanic. The clamp prevents unbounded random walk, and mining stations adapt automatically. The project-owned PRNG makes shifts replayable across save/load and platforms.
 
 ## Travel & Logistics (V1 — Autonomous Drone Model)
 
 Ships are autonomous drones. The player does not assign routes — ships read the network state and self-organize. Each station has an input buffer (what it needs) and an output buffer (what it produces). Ships fly from stations with surplus output to stations with demand for that material.
 
-Travel time depends on:
-- Distance between bodies (orbital lane positions)
-- Lane speed of the ship class
-- Cargo weight (heavier loads are slower)
+Travel time depends on radial distance, destination-lane arc distance, ship speed, lane multiplier, and cargo load. Fuel feasibility additionally includes the ship's position-to-supplier leg and base mass.
 
 The player sees **flow lines** on the map — animated colored lines that appear automatically between supply and demand stations. Ship icons move along these flows. The player influences logistics by:
 - Building more ships (more throughput)
@@ -90,7 +87,7 @@ The starting system map should have:
 
 Planets have a number of orbit rings and slots per ring, determining how many stations can be placed around each body.
 
-**Note:** The ranges below are for procedural generation (future). For V1, the starting system is **authored** with exact body IDs, radii/angles, slots, deposits, survey depth, names, and starting inventory. See the canonical content catalog (to be created) for the authored system data.
+**Note:** The ranges below are for procedural generation (future). For V1, the starting system is **authored** with exact body IDs, radii/angles, slots, deposits, survey depth, names, and starting inventory. See [14-authored-content.md](./14-authored-content.md) for the canonical content catalog.
 
 | Body | Type | Total Slots |
 |------|------|------------|
@@ -102,6 +99,6 @@ Planets have a number of orbit rings and slots per ring, determining how many st
 | Moon B (gas giant) | Moon | 1–2 |
 | Asteroid Belt | Belt | 4–6 |
 
-**Estimated total: ~16–26 station slots across the entire system.** This gives the player a clear upper bound for capacity planning. Slot counts are per-planet — once a planet's slots are full, new stations must be placed on another body.
+The authored V1 system has exactly **19 station slots**. Slot counts are per body—once its slots are full, new stations must be placed elsewhere or an existing station must be upgraded/demolished.
 
 This gives a variety of resources and travel distances to learn logistics with.

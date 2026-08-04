@@ -1,7 +1,7 @@
 ---
 status: Approved
 owner: Tech Lead
-last-reviewed: 2026-08-03
+last-reviewed: 2026-08-04
 ---
 
 # Zoom Levels & Camera
@@ -23,7 +23,7 @@ Three discrete zoom bands (1–3), not continuous. The camera snaps between them
 | Planets | Circles with surface texture pattern. Glow proportional to distance from star. Resource icons visible once surveyed. |
 | Moons | Small circles orbiting their planet |
 | Asteroid belts | Scattered dots in a region |
-| Stations | **Sprite icons** — a small hand-painted image representing the station type. Each station has its own distinct sprite. |
+| Stations | **Sprite icons** — a small authored 2D image representing the station type. Each station has its own distinct sprite. |
 | Ships | **Scaled hull sprites** — visible as recognizable ship shapes, not dots. Smaller at this band but still identifiable as a cargo/construction/research hull. |
 | Route lines | Curved colored lines following orbital paths. Color = cargo type, thickness = throughput. Animated dash shows flow direction. |
 | Fog | Covers unexplored bodies. Celestial silhouettes visible but contents hidden. |
@@ -67,10 +67,10 @@ Framed on a single planet. The planet fills a portion of the view. Orbit rings a
 Framed on a single station. The station is the focal point.
 
 **Visible elements (additional to Band 2):**
-- Station model in full detail (could be a mesh/model or a detailed sprite — TBD during implementation)
+- Detailed 2D station sprite assembled from PixiJS sprite layers; V1 has no mesh or 3D rendering
 - Docks with ship docking animations
 - Cargo loading/unloading (items moving along conveyors or drones)
-- Station status indicators (power, throughput, storage fill)
+- Station status indicators (activity, throughput, storage fill)
 - The logistics panel overlays the view (UI panel, not 3D)
 
 **Interaction:**
@@ -90,7 +90,8 @@ Between bands, the transition is instant (snap), not animated:
 | System → Planet | Click a planet |
 | System → Station | Click a station |
 | Planet → System | Click empty space or press zoom-out |
-| Station → System | Click empty space or press zoom-out |
+| Station → Planet | Press zoom-out or click the framed planet |
+| Station → System | Click empty space |
 | Planet ↔ Station | Click station on orbit ring / click planet from station |
 
 ---

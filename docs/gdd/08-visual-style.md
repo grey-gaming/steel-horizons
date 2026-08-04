@@ -1,7 +1,7 @@
 ---
-status: Draft
-owner: Tech Lead
-last-reviewed: 2026-08-03
+status: Approved
+owner: Product Owner
+last-reviewed: 2026-08-04
 ---
 
 # Visual Style & Direction
@@ -28,7 +28,7 @@ Transition is instant (snap). See [09-zoom-levels.md](./09-zoom-levels.md) for t
 
 ## Fog & Exploration
 
-Unexplored regions of the system are covered by **fog**. Planets and asteroid belts are visible as silhouettes, but their resource contents are hidden. To reveal them, build a **Research Ship** — the player clicks a body and selects 'Survey', then the ship autonomously flies there and scans. Once dispatched, the ship travels, enters a scanning orbit, and reveals resources after scan time completes.
+Unexplored regions of the system are covered by **fog**. Planets and asteroid belts are visible as silhouettes, but their resource contents are hidden. The player queues a survey depth on a body; an eligible idle Research Ship takes that job, travels there, and scans. It does not continue to another body unless another target is queued.
 
 - Surveyed planets show their resource profile (icons on the planet circle)
 - Surveyed belts show deposit density (scattered dots in the belt region)
@@ -60,6 +60,7 @@ At system view, routes are thin colored lines. At planet view, they thicken and 
 | Volcanic Sulfur | Bright Yellow | Rising gas plume | "Volcanic Sulfur" |
 | Chemicals | Bright Yellow | Vial bottle | "Chemicals" |
 | Water Ice | Ice Cyan | Hexagonal snowflake | "Water Ice" |
+| Frozen Gases | Pale Violet | Layered cloud | "Frozen Gases" |
 | Fuel | Ice Cyan | Flame shape | "Fuel" |
 | Helium-3 | Neon Green | Three-ring atom | "Helium-3" |
 | Reactor Rods | Neon Green | Cylinder bars | "Reactor Rods" |
@@ -69,7 +70,7 @@ At system view, routes are thin colored lines. At planet view, they thicken and 
 | Crystal Deposits | Pink | Faceted diamond | "Crystal Deposits" |
 | Gate Nodes | White / Gold | Six-sided hexagon | "Gate Node" |
 
-Colors are shared between raw/refined pairs (e.g., Metal Ore and Metals both use Steel Gray) because they are visually adjacent in the production chain. Each resource is uniquely identified by a combination of color + icon pattern, and the inspection panel shows the full text label. Route lines use color + animated dash pattern for identification. Non-color cues (icon shape, line dash style, text labels) ensure accessibility for color-blind players.
+Colors are shared between raw/refined pairs (e.g., Metal Ore and Metals both use Steel Gray) because they are visually adjacent in the production chain. Component cargo uses the eight diamond-icon/color families in GDD 10. Each ResourceType is identified by color plus its icon and inspection text. Route lines use one of 19 code-defined dash families (11 raw/refined families plus 8 components) and repeat the specific cargo icon at medium/detail zoom; raw/refined members may share a dash family but keep different icons. At the smallest zoom, selecting any line exposes the text label. These non-color cues keep flows usable for color-blind players.
 
 ## Planets
 

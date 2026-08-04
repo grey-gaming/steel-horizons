@@ -1,14 +1,14 @@
 ---
-status: Draft
-owner: Tech Lead
-last-reviewed: 2026-08-03
+status: Approved
+owner: Product Owner
+last-reviewed: 2026-08-04
 ---
 
 # Iconography & Textures
 
 ## Texture Generation Pipeline
 
-Planet textures are **hand-painted** using Draw Things CLI (local Stable Diffusion) and composited with ImageMagick. The pipeline:
+Planet textures are **AI-assisted 2D source art** generated locally with Draw Things and then edited/composited with ImageMagick. They must not be described as hand-painted unless a human artist actually repaints them. The pipeline:
 
 1. **Generate base textures** with Draw Things — prompt for each planet type (rocky surface, volcanic, icy, gas bands, cratered moon)
 2. **Tile and scale** with ImageMagick — ensure textures tile seamlessly for planet surfaces
@@ -16,6 +16,8 @@ Planet textures are **hand-painted** using Draw Things CLI (local Stable Diffusi
 4. **Export** as sprite sheets and individual textures
 
 This approach lets us generate many unique planet textures cheaply while keeping a hand-painted look.
+
+Every exported asset has a provenance record containing the source model/version and its license, prompt, seed, source generations, human edits, generation date, and reviewer. Assets without a distribution-compatible model/source license are development placeholders and cannot enter a public build. Generated output is checked for recognizable third-party characters, logos, or copied interface elements.
 
 ### Planet Texture Types Needed
 
@@ -36,7 +38,7 @@ Each texture is generated at a base resolution, then ImageMagick scales it to th
 
 ### System Icon View — Sprite Icons
 
-Each station type has a **hand-painted sprite icon** that represents it at the System Icon zoom band. These are small, distinct, and readable at a glance across 500+ stations.
+Each of the five station types has an **authored 2D sprite icon** that represents it at the System Icon zoom band. These are small, distinct, and readable at a glance up to the 200-station simulation ceiling (the authored V1 system has 19 slots). Its provenance record states whether the individual asset is human-drawn, AI-assisted, or composited.
 
 | Station | Sprite Concept |
 |---------|----------------|
@@ -45,11 +47,10 @@ Each station type has a **hand-painted sprite icon** that represents it at the S
 | Refinery Factory | Square with pipe/tank elements. Chemical/processing look. |
 | Construction Factory | Gear-shaped with assembly line elements. Industrial workshop. |
 | Research Station | Triangle with dish/sensor array. Scientific/lab look. |
-| Orbital Mining Station | Ring-shaped with collector arms. Different from surface mining. |
 
 ### Detailed View — Full Station Visual
 
-When zoomed to Detailed View, the sprite expands into a **full station model** (could be a mesh or a detailed sprite — implementation choice). The model shows:
+When zoomed to Detailed View, the icon expands into a **layered 2D station sprite** rendered by PixiJS. V1 uses no mesh or 3D model. The sprite shows:
 
 - **Docks** — visible docking ports where ships attach
 - **Storage** — cargo containers or tanks showing fill level
@@ -109,12 +110,13 @@ All icons are flat colored fills, no gradients. Color follows the cargo palette.
 | Carbon Soil / Carbon Fiber | Circle with cross-hatch | Warm Brown |
 | Silicon Dust / Silicon Wafers | Circle with diamond center | Cool Blue |
 | Volcanic Sulfur / Chemicals | Circle with flame shape | Bright Yellow |
-| Water Ice / Fuel | Circle with droplet | Ice Cyan |
+| Water Ice | Circle with snowflake | Ice Cyan |
+| Frozen Gases / Fuel | Circle with droplet/flame | Pale Violet / Ice Cyan |
 | Helium-3 / Reactor Rods | Circle with atom/nucleus | Neon Green |
 | Alloys | Circle with interlocking rings | Purple |
-| Optics / Sensors | Circle with eye/dot | Teal |
+| Optics | Circle with eye/dot | Teal |
 | Rare Earth Minerals | Circle with sparkle | Magenta |
-| Gate Nodes | Circle with ring/gate symbol | White/Gold |
+| Crystal Deposits | Circle with faceted diamond | Pink |
 
 ### Machine Icons
 
@@ -164,14 +166,14 @@ All icons are flat colored fills, no gradients. Color follows the cargo palette.
 | Asset | Quantity | Format | Resolution |
 |-------|----------|--------|-----------|
 | Planet textures | 6 (one per type) | Tileable PNG | 512x512 base |
-| Station sprites | 6 (one per type) | PNG with alpha | 128x128 |
-| Station detailed visuals | 6 | PNG/mesh | TBD |
+| Station sprites | 5 (one per type) | PNG with alpha | 128x128 |
+| Station detailed visuals | 5 | Layered PNG with alpha | 512x512 base |
 | Ship hull sprites | 12 (3 roles × 4 tiers) | PNG with alpha | 256x256 |
-| Cargo icons (materials) | 10 | PNG with alpha | 64x64 |
-| Cargo icons (machines) | 9 | PNG with alpha | 64x64 | (3 ships + 5 station types + Space Gate; Orbital Mining Station shares Mining Station icon)
+| Cargo icons (raw/refined families) | 11 | PNG with alpha | 64x64 |
+| Cargo icons (machines) | 9 | PNG with alpha | 64x64 | (3 ships + 5 station types + Space Gate)
 | Cargo icons (components) | 8 | PNG with alpha | 64x64 |
-| Route line colors | 10 | Defined in code | N/A |
+| Route line color/pattern families | 19 (11 material + 8 component) | Defined in code | N/A |
 | Fog overlay | 1 | PNG | 512x512 tileable |
-| UI panel backgrounds | ~5 | PNG | TBD |
+| UI panel backgrounds | 5 | Nine-slice PNG | 128x128 base |
 
-Total: ~50 individual assets for V1. Manageable with Draw Things + ImageMagick pipeline.
+Total: approximately 60 individual assets for V1, plus provenance records. This remains manageable with the Draw Things + ImageMagick pipeline.

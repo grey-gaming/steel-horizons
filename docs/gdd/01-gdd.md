@@ -1,7 +1,7 @@
 ---
 status: Approved
 owner: Product Owner
-last-reviewed: 2026-08-03
+last-reviewed: 2026-08-04
 audience: Development team, stakeholders
 ---
 
@@ -40,7 +40,7 @@ The game takes place in **one star system**. The system contains:
 - Moons orbiting some planets
 - Asteroid belts between orbital lanes
 
-The player starts with a single small construction ship, a basic station, and a **Starter Kit** of pre-assembled components (Drive Assembly, Research Lab, Construction Bay, Power Cores, Control System, Cargo Modules) that enable building the first ships and factories. The system is partially **fogged** — you can see celestial bodies but their resource contents are hidden until surveyed. Over the course of V1, the player will:
+The player starts with a single small Construction Ship, Hub Haven, and a validated **deployment kit** of pre-assembled components that funds the initial mine, refinery, Cargo Ship, Research Ship/Station, and first Construction Factory. Exact quantities are owned by GDD 14. The system is partially **fogged** — you can see celestial bodies but their resource contents are hidden until surveyed. Over the course of V1, the player will:
 - Explore and survey the system to reveal resources
 - Establish mining operations on multiple bodies
 - Build a logistics network of cargo ships and stations
@@ -52,17 +52,17 @@ The Space Gate is the top of the tech tree. Completing it enables V2 — travel 
 
 ## Difficulty Philosophy — No Failure State
 
-Steel Horizons has **no failure state**. There is no game over, no ship destruction, no pirates, no permanent resource loss. The challenge is purely **logistical** — can you design a network that moves materials efficiently?
+Steel Horizons has **no failure state**. There is no game over, ship destruction, or accidental permanent loss of invested components. Research and the final Gate intentionally consume resources, but their value is permanent: research progress cannot be abandoned, and reversible ships/stations recycle their full component recipes. The challenge is purely **logistical** — can you design a network that moves materials efficiently?
 
-If production backs up or routes are inefficient, things slow down or stop — but nothing is destroyed. You can always recover by redesigning routes, adding capacity, or researching better technology. The game is a **cozy logistical puzzle**, not a survival game.
+If production backs up or routes are inefficient, things slow down or stop—but nothing is destroyed. You can recover by redesigning flows, recycling structures, claiming salvage, using the renewable belt economy, or researching better technology. The game is a **cozy logistical puzzle**, not a survival game.
 
 The difficulty comes from:
-- **Resource availability** — deposits are finite in throughput, forcing you to expand to new bodies
+- **Resource availability** — planet/moon deposits are finite in quantity and every source has finite throughput, encouraging expansion to new bodies
 - **Placement strategy** — station position determines route efficiency
 - **Capacity planning** — too few ships = bottlenecks, too many = wasted components
 - **Tech prioritization** — which research to pursue first shapes your options
 
-There is always a solution. The game rewards smart network design, not twitch reflexes.
+There is always a solution. CI validates the authored bootstrap, resource budget, and victory path; the game rewards smart network design, not twitch reflexes.
 
 ## Design Influences
 

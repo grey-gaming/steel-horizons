@@ -1,108 +1,92 @@
 # Steel Horizons
 
-**A cozy single-system space logistics game.** Build a network of autonomous ships, stations, and factories to transport materials, research technology, and construct a Space Gate to the next system.
+**A cozy single-system space logistics game.** Build autonomous ships, stations, and factories; research technology; and construct a Space Gate.
 
 ## Status
 
-**Design phase.** All 14 design documents are in `docs/`. No playable build exists yet. This repository contains the game design specification, not source code.
+**V1 design approved; Phase 1 implementation ready.** The repository currently contains specifications rather than source code. Phase 1 is the Rust deterministic simulation engine, authenticated local HTTP/WS API, Python text UI, and agent play-tests. Phase 2 is the PixiJS v8/Tauri graphical client.
 
-## Quick Start
+## Reading Order
 
-Start reading in this order:
+### Game Design
 
-1. `docs/01-gdd.md` — Game Design Document (pitch, scope, core loop)
-2. `docs/02-the-system.md` — The starting star system (planets, resources, travel)
-3. `docs/03-economy.md` — Economy overview (resources, recipes, fuel, power)
-4. `docs/04-tech-tree.md` — Technology tree (unlocks, costs, prerequisites)
-5. `docs/05-ships-stations-factories.md` — Entity catalog (tiers, stats, specials)
-6. `docs/06-onboarding.md` — First-hour player experience walkthrough
-7. `docs/07-routes-and-logistics.md` — Autonomous logistics (job matching, reservations)
-8. `docs/08-visual-style.md` — Visual direction (palette, icons, camera)
-9. `docs/09-zoom-levels.md` — Zoom bands and camera transitions
-10. `docs/10-iconography-and-textures.md` — Asset inventory and art pipeline
-11. `docs/11-ui-interactions.md` — UI panels, interactions, keyboard shortcuts
-12. `docs/12-simulation-foundations.md` — Tick order, rates, save/load, invariants
-13. `docs/13-data-models.md` — Entity struct definitions and types
-14. `docs/v2-gate-logistics.md` — Future inter-system route model (V2 concept)
+1. [`docs/gdd/01-gdd.md`](docs/gdd/01-gdd.md) — pitch, scope, loop, difficulty
+2. [`docs/gdd/02-the-system.md`](docs/gdd/02-the-system.md) — geography, deposits, travel
+3. [`docs/gdd/03-economy.md`](docs/gdd/03-economy.md) — economy and recovery rules
+4. [`docs/gdd/04-tech-tree.md`](docs/gdd/04-tech-tree.md) — unlock graph and research
+5. [`docs/gdd/05-ships-stations-factories.md`](docs/gdd/05-ships-stations-factories.md) — entity behavior
+6. [`docs/gdd/06-onboarding.md`](docs/gdd/06-onboarding.md) — validated first-five-hour sequence
+7. [`docs/gdd/07-routes-and-logistics.md`](docs/gdd/07-routes-and-logistics.md) — autonomous matching and reservations
+8. [`docs/gdd/08-visual-style.md`](docs/gdd/08-visual-style.md) — visual direction
+9. [`docs/gdd/09-zoom-levels.md`](docs/gdd/09-zoom-levels.md) — camera bands
+10. [`docs/gdd/10-iconography-and-textures.md`](docs/gdd/10-iconography-and-textures.md) — asset system
+11. [`docs/gdd/11-ui-interactions.md`](docs/gdd/11-ui-interactions.md) — interactions and recovery UI
+12. [`docs/gdd/12-simulation-foundations.md`](docs/gdd/12-simulation-foundations.md) — authoritative tick/math/travel rules
+13. [`docs/gdd/13-data-models.md`](docs/gdd/13-data-models.md) — authoritative state schema
+14. [`docs/gdd/14-authored-content.md`](docs/gdd/14-authored-content.md) — authoritative exact content/balance
+
+[`docs/gdd/v2-gate-logistics.md`](docs/gdd/v2-gate-logistics.md) is a non-implementation V2 concept.
+
+### Architecture and Implementation
+
+- [`docs/adr/`](docs/adr/) — accepted architectural decisions
+- [`docs/tdd/`](docs/tdd/) — approved Phase 1 implementation design
 
 ## V1 Scope
 
-Steel Horizons V1 is a **single star system** with autonomous drone logistics. The player:
-- Places stations on orbit rings around planets, moons, and belts
-- Builds ships at station hubs
-- Chooses what to refine, build, and research
-- Watches ships autonomously transport materials between stations
-- Wins by constructing and activating a Space Gate
+V1 is one authored star system. The player:
 
-V1 is **not** a galaxy-scale game. Inter-system travel, explicit route assignment, and fleet coordination are V2 features.
+- Places stations in fixed orbit-ring slots
+- Configures mining, refining, construction, and research
+- Builds ships at Station Hubs
+- Influences autonomous logistics with placement, thresholds, capacity, and priority
+- Surveys bodies to progressive depths
+- Wins by building and activating the Space Gate
 
-## Design Principles
+Inter-system travel, recurring manual routes, combat, destruction, perishable cargo, quality systems, multi-build ships, and fleet coordination are post-V1.
 
-- **Always solvable:** Every valid player action sequence can progress. No soft-locks.
-- **No failure states:** No losing, no destruction. The player can always recover by reconfiguring their network.
-- **Autonomous drones:** Ships self-organize. The player designs the network, not individual routes.
-- **Distributed buffers:** Materials live in station buffers, not a global pool. Logistics emerge from supply/demand broadcasts.
+## Design Invariants
 
-## Documentation Convention
+- **Always solvable:** the validated starting state and every reversible recovery action retain a path to victory.
+- **No accidental material loss:** cancelling, demolition, and scrapping return complete invested components; salvage never decays.
+- **Persistent research value:** pausing research retains progress and consumed-resource credit.
+- **Autonomous drones:** ships select deterministic one-shot jobs; players design the network.
+- **Distributed storage:** no global material pool.
+- **Deterministic simulation:** integer-only state, stable command order, exact save/load/replay equivalence.
 
-- `docs/` files are numbered by reading order (01–13). `v2-gate-logistics.md` is a future concept file outside the V1 sequence.
-- **Decision** labels mark authoritative rules. **Example** labels mark illustrative values that may change during balance.
-- The canonical source for entity definitions is `docs/13-data-models.md`. Prose in other files should not contradict the data model.
-- Technology unlocks, recipe requirements, and entity stats have single owners — see `docs/04-tech-tree.md` for the unlock graph.
+## Authority and Change Rules
 
-## Glossary
+When documents overlap, authority is:
 
-| Term | Definition |
-|------|-----------|
-| **Orbit ring** | A circular orbital lane around a celestial body. Stations float on orbit rings. |
-| **Slot** | A placeable position on an orbit ring. Each ring has a fixed number of slots. |
-| **Dock** | A station's ship-berth capacity. Ships must dock to load/unload/research/refuel. |
-| **Buffer** | Per-resource storage at a station. Each resource type has its own buffer cap. |
-| **Supply broadcast** | A signal emitted when a buffer rises above its export threshold — "I have material X to give away." |
-| **Demand broadcast** | A signal emitted when a buffer drops below its demand threshold — "I need material X delivered." |
-| **Job** | A one-shot autonomous task a ship picks up: transport cargo X from A to B, build a station, survey a body. |
-| **Tier** | Progression level (1–4 for most entities). Higher tiers unlock better rates, capacities, and recipes. |
-| **Tier 0** | Starting technologies and recipes available without research. |
-| **Lane** | An orbital path shared by all bodies at a given distance from the star. Ships travel along lanes. |
-| **Survey depth** | How thoroughly a body has been scanned: 0=none (fogged), 1=surface (visible deposits), 2=subsurface (hidden deposits revealed), 3=full (all resources). |
-| **Belt** | Asteroid belt resource deposit that never depletes but drifts slowly over time. |
-| **Space Gate** | The V1 victory structure — built from Gate Nodes, powered by Reactor Rods, enabling inter-system travel. |
-| **Hub** | The Station Hub — player's main base. Can assemble Tier 1 components and has built-in research capability. |
-| **Construction Ship** | Ship type that places stations, builds upgrades, and constructs the Gate. |
-| **Research Ship** | Ship type that surveys bodies and powers research when docked at a Research Station. |
-| **Cargo Ship** | Ship type that transports materials between station buffers autonomously. |
+1. Accepted ADRs for architectural decisions
+2. GDD 12 for simulation semantics and formulas
+3. GDD 13 for serialized state shapes
+4. GDD 14 for exact content, costs, statistics, and starting values
+5. Other approved GDDs for player-facing behavior and presentation
+6. TDDs for implementation structure, which must implement the above contracts
 
-## Product Requirements (V1)
+Changing an authoritative rule requires updating every dependent summary and its executable validation/test in the same change. “Example” values are non-authoritative only when explicitly labelled; GDD 14 contains no example balance values.
 
-- **Platform:** macOS (primary), Windows (secondary). Linux is not a V1 target.
-- **Renderer:** PixiJS v8 (WebGL/Canvas). No 3D or mesh rendering.
-- **Resolution:** Minimum 1280×720, designed for 1920×1080. Aspect ratio 16:9.
-- **Offline:** Fully offline single-player. No server or internet required.
-- **Distribution:** Steam (planned), itch.io (backup).
-- **Session length:** 30–90 minutes per session. Onboarding ~5 hours total.
+## Product Requirements
 
-## Deferred Documentation
+- **Platforms:** macOS primary, Windows secondary
+- **Renderer:** PixiJS v8, packaged with Tauri in Phase 2; 2D sprites only
+- **Resolution:** minimum 1280×720, designed for 1920×1080 at 16:9
+- **Offline:** fully offline single-player; the engine's authenticated server is loopback-only
+- **Distribution:** Steam planned, itch.io backup
+- **Session length:** 30–90 minutes; onboarding approximately five hours across sessions
+- **Input:** mouse and keyboard in V1; touch/controller post-V1
+- **Save:** one local autosave slot in V1
 
-These documents are recommended by the design review (M-03, M-04) but deferred until implementation begins:
+## Minimal V1 Settings and Accessibility
 
-- **Technical architecture** — module boundaries, content-loading approach, event/command model, rendering vs simulation ownership, dependency direction, error strategy, and deterministic test harness.
-- **Test and balance strategy** — unit/property tests, golden simulation scenarios, progression reachability, resource conservation, save/load equivalence, deterministic replay, performance benchmarks, UI accessibility checks, and playtest metrics.
-- **Responsive layout wireframe** — full-screen HUD layout, panel stacking, z-order, focus restoration, overflow handling.
-- **Audio/settings/localization** — sound cues, volume controls, graphics/accessibility settings, key rebinding, localization-safe strings.
+V1 includes reduced motion, UI scale, color-independent resource identification, keyboard navigation, and documented shortcuts. Audio, full localization, controller input, cloud saves, and advanced graphics settings are post-V1.
 
-## Open Decisions
+## Implementation Entry Criteria
 
-These design questions are unresolved and need Product Owner input before implementation proceeds:
-
-1. **Authored vs procedural starting system** — V1 currently assumes an authored system, but procedural generation ranges are documented. Decision: authored for V1, procedural for V2.
-2. **Special mechanics** — Several ship/station specials (armor, perishable goods, research bonuses, multi-build, automated cargo routing, fleet coordination, quality) have no defined mechanics. Decision: defer to post-V1; implement core hull stats only.
-3. **Save slot count** — V1 documents one autosave slot. Multiple slots or cloud saves are deferred.
-4. **Touch/controller support** — Mouse-only for V1. Touch and controller are V2.
-5. **Audio/Settings/Localization** — All deferred to post-V1. V1 scope is visual simulation only.
-6. **License** — Pending selection (MIT or custom). Repository is private during design phase.
+The approved documents require CI gates for content validation, bootstrap reachability, all-tech reachability, full Gate victory, recovery, conservation, deterministic replay, save/load equivalence, API transport conformance, and supported-platform state hashes. Implementation is ready to begin with those tests driving behavior.
 
 ## Repository Governance
 
-- **Status:** Design documents only. No source code yet.
-- **License:** [License TBD — see Open Decisions]
-- **Contributions:** [Not open for contributions at this phase.]
+- **License:** pending before public distribution; private internal development may proceed. See [`LICENSE`](LICENSE).
+- **Contributions:** not open during initial implementation.

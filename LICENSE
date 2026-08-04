@@ -1,7 +1,9 @@
 Steel Horizons — License
 
-Status: Pending. License will be selected before public distribution.
-Repository is private during design phase. Contributors: none at this phase.
+Status: Pending. No public license grant is made by this placeholder.
+The repository remains private during initial implementation. Contributors: none at this phase.
 
-License candidates: MIT (permissive) or custom (asset-protective, given AI-assisted art).
-Decision deferred until V1 implementation phase begins.
+Code-license candidates: MIT or another OSI-approved license. Art/content may use a
+separate asset license after provenance review. The decision does not block private
+development, but must be completed before accepting outside contributions, publishing
+source, or distributing binaries/assets.
