@@ -550,7 +550,7 @@ Notes: G0-08 resolves four open specification questions: (1) exhaustive event ty
 ```text
 Increment: G0-09
 Date: 2026-08-04
-Commit: a0e28cc
+Commit: 3455791
 Requirements: ADR-0005 — Test Architecture §CI Policy; TDD 04 — Testing Strategy §Quality Gates; IMPLEMENTATION_PLAN.md — Delivery Principles §cumulative-gate, §Per-turn protocol step 7, §Phase 1 completion gate; AGENTS.md — §Verification order
 Focused proof: Focused text/link consistency review — every CI policy statement in ADR-0005, TDD 04, this plan, and AGENTS.md now expresses the same cumulative-gate policy during Phase 1 greenfield construction: (1) every commit runs all gates activated so far; (2) scenarios whose owning increment has not yet completed are not required; (3) API, persistence/replay, and Python gates become mandatory only when their owning infrastructure increment exists; (4) macOS CI runs every commit, Windows CI at P1-36; (5) at Phase 1 completion, the full Phase 1 completion gate is mandatory. Future executable proof: P1-01 automates protocol/policy synchronization via a marker-based check that the duplicated per-turn protocol is byte-identical in both documents.
 Cumulative gates: Document consistency verification (cross-reference check against ADR-0005 §CI Policy, TDD 04 §Quality Gates, this plan §Delivery Principles/§Per-turn protocol step 7/§Phase 1 completion gate, AGENTS.md §Verification order)
