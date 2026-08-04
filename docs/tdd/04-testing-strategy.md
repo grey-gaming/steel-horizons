@@ -8,14 +8,33 @@ date: 2026-08-04
 
 ## Quality Gates
 
-Every commit runs, in order:
+### Phase 1 Greenfield Construction
 
-1. Formatting and Clippy with warnings denied
-2. Content/schema validation
-3. Unit/property tests
-4. Deterministic scenario tests, including bootstrap and Gate victory
-5. HTTP/WS API conformance tests
-6. Save/load and command-log replay equivalence
+During Phase 1 development, every commit runs all gates activated so far, in order:
+
+1. Rust formatting and Clippy with warnings denied.
+2. Content/schema validation.
+3. Unit/property tests.
+4. Every deterministic scenario activated so far (see the scenario activation matrix in the implementation plan). Scenarios whose owning increment has not yet completed are not required.
+5. HTTP/WS API conformance tests — once the API transport exists (P1-14), these become mandatory on every commit.
+6. Save/load and command-log replay equivalence — once persistence exists (P1-13), these become mandatory on every commit.
+
+Platform CI: macOS runs every commit during Phase 1. Windows CI is added at P1-36.
+
+### Phase 1 Completion Gate
+
+At Phase 1 completion, the full gate defined in the implementation plan is mandatory, in order:
+
+1. Rust formatting and Clippy with warnings denied.
+2. Full schema/content validation, including exact bootstrap and critical-resource budget.
+3. Unit and property tests for arithmetic, invariants, conservation, ordering, recovery, and overflow.
+4. All twelve deterministic scenarios.
+5. Complete HTTP/WebSocket API conformance and security/backpressure tests.
+6. Save/load, batch/real-time, and command-log replay equivalence over the completed game.
+7. Python formatting, typing, unit/integration tests, all renderer modes, and agent play-tests.
+8. Supported-platform canonical state hashes.
+9. V1-ceiling release benchmark.
+10. Locked private artifacts and SBOM.
 
 Nightly/pre-release additionally runs Python agent play-tests, cross-platform golden-state comparison, and V1-ceiling benchmarks.
 

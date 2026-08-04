@@ -87,15 +87,23 @@ On every implementation turn, follow this sequence without skipping steps:
 
 ## Verification order
 
-Once the corresponding tooling exists, the ordinary cumulative gate is:
+### Phase 1 greenfield construction
+
+During Phase 1 development, every commit runs all gates activated so far, in this order:
 
 1. Rust formatting and Clippy with warnings denied.
 2. Content/schema validation.
 3. Unit and property tests.
-4. Every activated deterministic scenario.
-5. HTTP/WebSocket API conformance.
-6. Save/load and command-log replay equivalence.
-7. Python formatting, typing, and unit/integration tests.
+4. Every deterministic scenario activated so far (see the scenario activation matrix in the implementation plan). Scenarios whose owning increment has not yet completed are not required.
+5. HTTP/WebSocket API conformance — once the API transport exists (P1-14), these become mandatory on every commit.
+6. Save/load and command-log replay equivalence — once persistence exists (P1-13), these become mandatory on every commit.
+7. Python formatting, typing, and unit/integration tests — once the Python client exists (P1-34), these become mandatory on every commit.
+
+Platform CI: macOS runs every commit during Phase 1. Windows CI is added at P1-36.
+
+### Phase 1 completion gate
+
+At Phase 1 completion, the full gate defined in the Phase 1 completion gate section of the implementation plan is mandatory.
 
 Nightly/pre-release gates add the Python agent play-tests, supported-platform state-hash comparison, and the V1-ceiling benchmark. Use the exact repository commands established by increment P1-01 rather than substituting ad hoc commands.
 

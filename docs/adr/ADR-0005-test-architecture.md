@@ -98,9 +98,20 @@ Required pre-release scripts:
 - Recovery after deliberately poor builds
 - V1-ceiling stress run
 
-## CI Policy
+## CI Policy — Greenfield Construction (Phase 1)
 
-Every commit runs content validation, Rust format/lint, unit/property tests, all deterministic scenarios including Gate victory, and API integration tests on macOS and Windows. Agent scripts and extended stress benchmarks run nightly and before release.
+During Phase 1 development, every commit runs all gates activated so far, in order:
+
+1. Rust formatting and Clippy with warnings denied.
+2. Content/schema validation.
+3. Unit/property tests.
+4. Every deterministic scenario activated so far per the scenario activation matrix in the implementation plan. Scenarios whose owning increment has not yet completed are not required.
+5. HTTP/WS API conformance tests — once the API transport exists (P1-14), these become mandatory on every commit.
+6. Save/load and command-log replay equivalence — once persistence exists (P1-13), these become mandatory on every commit.
+
+Platform CI: macOS runs every commit throughout Phase 1. Windows CI is added at P1-36. Cross-platform state-hash comparison runs nightly and before release.
+
+At Phase 1 completion, all gates listed in the Phase 1 completion gate section of the implementation plan are mandatory.
 
 A flaky deterministic test is a product defect; retries are not an accepted mitigation.
 
