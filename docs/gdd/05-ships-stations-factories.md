@@ -57,7 +57,7 @@ Stations occupy fixed slots on orbit rings. Every station has installed componen
 
 ### Station Hub
 
-The Hub is the logistics and shipbuilding center. Every tier has one shipyard queue and one slow component-assembly slot; Hub upgrades increase docks/storage rather than parallel build slots. It provides:
+The Hub is the logistics and shipbuilding center. Every tier has one shipyard queue and one slow component-assembly slot; Hub upgrades increase docks/storage rather than parallel build slots. The shipyard queue is a FIFO ordered queue with exactly one active build at a time; pending orders wait in creation sequence order (ADR-0009). It provides:
 
 - General cargo storage plus a separate Fuel compartment
 - Ship construction, one ship order at a time

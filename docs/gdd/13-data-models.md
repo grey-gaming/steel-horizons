@@ -133,6 +133,7 @@ struct Station {
   mining_targets: MiningTarget[]
   built_in_research_max_tier: u8 | null
   active_research_id: TechId | null
+  ship_build_queue: BuildOrderId[]  // Hub only; ordered FIFO queue of ship build orders; first entry is active (ADR-0009)
 }
 ```
 
