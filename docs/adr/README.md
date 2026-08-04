@@ -15,3 +15,4 @@ Status: proposed | accepted | deprecated | superseded
 | ADR-0003 | Command/Query API with WebSocket Streaming | accepted | API protocol — dual REST + WebSocket for sync commands and streaming |
 | ADR-0004 | Game Lifecycle State Machine | accepted | Game lifecycle — explicit state machine for Unloaded → Won |
 | ADR-0005 | Test Architecture — TDD, Simulation Tests, API Tests | accepted | Four-tier testing strategy for TDD workflow |
+| ADR-0006 | Canonical Content/State Hashing | accepted | SHA-256, canonical JSON serialization, BTreeMap ordering, golden-update policy |

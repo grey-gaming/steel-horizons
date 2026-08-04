@@ -133,7 +133,7 @@ Before implementing an increment, read its row here and the more-specific cross-
 Although the Phase 1 architecture is approved, the following deterministic contracts must be made explicit before their dependent production increments. Resolve each as a small doc-only change using the authority hierarchy, then add its planned executable proof. Do not bury these decisions inside code.
 
 - [x] **G0-01 — Complete machine-readable content schemas.** Define `ShipStats`, `StationStats`, the starting-scenario record, Gate definition, authored defaults, and schema-generation ownership. Required before P1-02/P1-03.
-- [ ] **G0-02 — Define canonical content/state hashing.** Specify included/excluded fields, canonical byte encoding, map/set ordering, hash function/version, and golden-update policy. Required before P1-05/P1-08.
+- [x] **G0-02 — Define canonical content/state hashing.** Specify included/excluded fields, canonical byte encoding, map/set ordering, hash function/version, and golden-update policy. Required before P1-05/P1-08.
 - [ ] **G0-03 — Define the save envelope.** Place the normalized content hash outside or inside the authoritative root state explicitly, and specify schema/content compatibility and migration fixtures. Required before P1-13.
 - [ ] **G0-04 — Define accepted-command persistence.** Specify what `SaveNow` does with commands accepted for future ticks, pending actor-mailbox state, command outcomes, and idempotency records across save/load and process restart. Required before P1-13.
 - [ ] **G0-05 — Define Hub shipyard queue semantics.** Specify capacity, ordering, active work representation, cancellation, and serialized fields. Required before P1-15.
@@ -461,4 +461,16 @@ Cumulative gates: Document consistency verification (see G0-01 evidence in sessi
 Scenarios activated: none (doc-only Gate 0)
 Golden/hash changes: none (no executable golden files affected)
 Notes: G0-01 is a specification-closure Gate 0 increment. No behavioral tests exist yet. The structs defined here are the canonical shapes for content JSON in P1-01/P1-02. Schema generation ownership is assigned to Tech Lead and the engine build process.
+```
+
+```text
+Increment: G0-02
+Date: 2026-08-04
+Commit: (pending — no production code changed)
+Requirements: ADR-0006 — Canonical Content/State Hashing; GDD 13 §Root State; GDD 12 §Save, Load, and Replay; ADR-0005 §Content Validation Gate, §CI Policy
+Focused proof: Document consistency check — every hash policy in ADR-0006 references existing GDD 13 serialized shapes, GDD 14 authored content, GDD 12 persistence rules, and ADR-0005 CI/golden policy. No contradiction with any existing ADR. Future executable proof: P1-05 validates content hash against golden; P1-08 locks tick-zero state hash against golden.
+Cumulative gates: Document consistency verification (cross-reference check against GDD 12, GDD 13, GDD 14, ADR-0001, ADR-0002, ADR-0005, TDD 00, TDD 01)
+Scenarios activated: none (doc-only Gate 0)
+Golden/hash changes: none (no executable golden files exist yet; golden file paths defined in ADR-0006 for future P1-05/P1-08 use)
+Notes: G0-02 specifies SHA-256 for both content and state hashing, canonical Serde JSON serialization with sorted keys and BTreeMap/BTreeSet ordering, included/excluded fields for scenario vs replay hash modes, golden-update policy with review and CI failure requirements, and save-file integrity checks. Dependent on GDD 13 state shapes and GDD 14 content records that already exist.
 ```
