@@ -130,7 +130,7 @@ If materials run out mid-research (station buffer dips below reserved amount), p
 | Advanced Fabrication | 800 Alloys + 400 Optics + 300 Control Systems + 200 Power Cores | 3,600 ticks |
 | Gate Construction | 500 Alloys + 300 Reactor Rods + 200 Power Cores | 4,800 ticks |
 | Grid Power | 300 Alloys + 200 Reactor Rods + 150 Control Systems | 2,400 ticks |
-| System Bridge | 200 Gate Nodes + 100 Reactor Rods + 50 Power Cores | 1,200 ticks |
+| System Bridge | 200 Alloys + 100 Reactor Rods + 50 Power Cores | 1,200 ticks |
 
 Costs scale with tier. Higher-tier research requires refined goods and components, not just raw materials. These are example values — actual costs will be balanced during playtesting.
 
