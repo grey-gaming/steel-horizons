@@ -135,7 +135,7 @@ Although the Phase 1 architecture is approved, the following deterministic contr
 - [x] **G0-01 — Complete machine-readable content schemas.** Define `ShipStats`, `StationStats`, the starting-scenario record, Gate definition, authored defaults, and schema-generation ownership. Required before P1-02/P1-03.
 - [x] **G0-02 — Define canonical content/state hashing.** Specify included/excluded fields, canonical byte encoding, map/set ordering, hash function/version, and golden-update policy. Required before P1-05/P1-08.
 - [x] **G0-03 — Define the save envelope.** Place the normalized content hash outside or inside the authoritative root state explicitly, and specify schema/content compatibility and migration fixtures. Required before P1-13.
-- [ ] **G0-04 — Define accepted-command persistence.** Specify what `SaveNow` does with commands accepted for future ticks, pending actor-mailbox state, command outcomes, and idempotency records across save/load and process restart. Required before P1-13.
+- [x] **G0-04 — Define accepted-command persistence.** Specify what `SaveNow` does with commands accepted for future ticks, pending actor-mailbox state, command outcomes, and idempotency records across save/load and process restart. Required before P1-13.
 - [ ] **G0-05 — Define Hub shipyard queue semantics.** Specify capacity, ordering, active work representation, cancellation, and serialized fields. Required before P1-15.
 - [ ] **G0-06 — Define mining boundary behavior.** Specify full-output handling, finite-deposit exhaustion when production exceeds the remainder, and the extraction/belt-drift order at tick multiples of 1,000. Required before P1-17/P1-26.
 - [ ] **G0-07 — Define deterministic refueling.** Specify eligible ship roles, Fuel-station selection and tie-breaks, route feasibility, transfer quantity/timing, partial stock behavior, and dock usage. Required before P1-20/P1-21.
@@ -485,4 +485,16 @@ Cumulative gates: Document consistency verification (cross-reference check again
 Scenarios activated: none (doc-only Gate 0)
 Golden/hash changes: none (no executable golden files exist yet)
 Notes: G0-03 resolves three open specification questions: (1) the save envelope is a JSON wrapper with format_version, content_version, state_hash, timestamp, and game_state; (2) the normalized content hash is placed outside GameState (not in the envelope at all — it remains a startup-validation concern); (3) schema migration is one-way with additive transforms, version-numbered fixtures, and golden-hash verification for each migration step. Dependent on ADR-0006 canonical serialization and hash rules, GDD 13 state shapes, and GDD 12 persistence semantics that already exist.
+```
+
+```text
+Increment: G0-04
+Date: 2026-08-04
+Commit: 41a1779
+Requirements: ADR-0008 — Accepted-Command Persistence; GDD 13 §CommandRecord, §CommandOutcome, §GameState/command_log; ADR-0003 §Command Envelope and Ordering, §Idempotency; ADR-0004 §Save Normalization; ADR-0006 §Replay-mode hash; ADR-0007 §Load procedure
+Focused proof: Document consistency check — every accepted-command persistence rule in ADR-0008 references existing GDD 13 serialized shapes (CommandRecord, CommandOutcome, command_log), ADR-0003 command envelope/idempotency rules, ADR-0004 lifecycle/save normalization, ADR-0006 replay-mode hash policy, and ADR-0007 save envelope/load procedure. No contradiction with any existing ADR, GDD, or TDD. Future executable proof: P1-13 validates save/load round-trip preserves pending commands and idempotency; P1-13 also verifies command_log_replay_equivalence with pending commands serialized in the save.
+Cumulative gates: Document consistency verification (cross-reference check against ADR-0003 §Command Envelope and Ordering, ADR-0004 §Save Normalization, ADR-0006 §Replay hash, ADR-0007 §Load procedure, GDD 13 §CommandRecord/§CommandOutcome/§GameState, TDD 01 §Simulation Actor)
+Scenarios activated: none (doc-only Gate 0)
+Golden/hash changes: none (no executable golden files exist yet)
+Notes: G0-04 resolves four open specification questions: (1) pending commands are serialized in command_log with outcome=Accepted — no separate pending_commands field in GameState; (2) the actor drains its mailbox before taking a save snapshot, leaving no mailbox state to serialize; (3) CommandOutcome lifecycle is Accepted→Applied/Rejected, with Accepted indicating a queued-but-unexecuted command; (4) idempotency survives save/load via command_log rebuild, but commands accepted after the last save are lost on process restart and clients must resubmit. Dependent on ADR-0003 command envelope/idempotency rules, ADR-0004 save normalization, ADR-0006 replay-mode hash, ADR-0007 save envelope format, and GDD 13 state shapes that already exist.
 ```
