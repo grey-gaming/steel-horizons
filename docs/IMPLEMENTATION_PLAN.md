@@ -134,7 +134,7 @@ Although the Phase 1 architecture is approved, the following deterministic contr
 
 - [x] **G0-01 — Complete machine-readable content schemas.** Define `ShipStats`, `StationStats`, the starting-scenario record, Gate definition, authored defaults, and schema-generation ownership. Required before P1-02/P1-03.
 - [x] **G0-02 — Define canonical content/state hashing.** Specify included/excluded fields, canonical byte encoding, map/set ordering, hash function/version, and golden-update policy. Required before P1-05/P1-08.
-- [ ] **G0-03 — Define the save envelope.** Place the normalized content hash outside or inside the authoritative root state explicitly, and specify schema/content compatibility and migration fixtures. Required before P1-13.
+- [x] **G0-03 — Define the save envelope.** Place the normalized content hash outside or inside the authoritative root state explicitly, and specify schema/content compatibility and migration fixtures. Required before P1-13.
 - [ ] **G0-04 — Define accepted-command persistence.** Specify what `SaveNow` does with commands accepted for future ticks, pending actor-mailbox state, command outcomes, and idempotency records across save/load and process restart. Required before P1-13.
 - [ ] **G0-05 — Define Hub shipyard queue semantics.** Specify capacity, ordering, active work representation, cancellation, and serialized fields. Required before P1-15.
 - [ ] **G0-06 — Define mining boundary behavior.** Specify full-output handling, finite-deposit exhaustion when production exceeds the remainder, and the extraction/belt-drift order at tick multiples of 1,000. Required before P1-17/P1-26.
@@ -473,4 +473,16 @@ Cumulative gates: Document consistency verification (cross-reference check again
 Scenarios activated: none (doc-only Gate 0)
 Golden/hash changes: none (no executable golden files exist yet; golden file paths defined in ADR-0006 for future P1-05/P1-08 use)
 Notes: G0-02 specifies SHA-256 for both content and state hashing, canonical Serde JSON serialization with sorted keys and BTreeMap/BTreeSet ordering, included/excluded fields for scenario vs replay hash modes, golden-update policy with review and CI failure requirements, and save-file integrity checks. Dependent on GDD 13 state shapes and GDD 14 content records that already exist.
+```
+
+```text
+Increment: G0-03
+Date: 2026-08-04
+Commit: 8565489
+Requirements: ADR-0007 — Save Envelope Format, Content Hash Placement, and Migration Fixtures; GDD 12 §Save, Load, and Replay; GDD 13 §GameState; ADR-0006 §Save File Hash; ADR-0004 §Save Normalization; ADR-0005 §Content Validation Gate, §CI Policy
+Focused proof: Document consistency check — every save-envelope rule in ADR-0007 references existing GDD 13 serialized shapes, GDD 12 persistence semantics, ADR-0006 canonical serialization and hash rules, ADR-0004 lifecycle normalization, and ADR-0005 content validation policy. No contradiction with any existing ADR, GDD, or TDD. Future executable proof: P1-13 validates save/load round-trip with state-hash integrity and schema migration; P1-13 also verifies migration fixtures against golden hashes.
+Cumulative gates: Document consistency verification (cross-reference check against GDD 12 §Save Load and Replay, GDD 13 §GameState/GameSnapshot, ADR-0006 §Save File Hash, ADR-0004 §Save Normalization, ADR-0005 §Content Validation Gate, ADR-0003 §Command Envelope)
+Scenarios activated: none (doc-only Gate 0)
+Golden/hash changes: none (no executable golden files exist yet)
+Notes: G0-03 resolves three open specification questions: (1) the save envelope is a JSON wrapper with format_version, content_version, state_hash, timestamp, and game_state; (2) the normalized content hash is placed outside GameState (not in the envelope at all — it remains a startup-validation concern); (3) schema migration is one-way with additive transforms, version-numbered fixtures, and golden-hash verification for each migration step. Dependent on ADR-0006 canonical serialization and hash rules, GDD 13 state shapes, and GDD 12 persistence semantics that already exist.
 ```
