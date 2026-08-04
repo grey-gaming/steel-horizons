@@ -458,6 +458,32 @@ struct TechDefinition {
   unlocks: string[]
 }
 
+struct ShipStats {
+  // Cargo ships: cargo_capacity > 0; build_cargo_capacity = 0; survey fields = 0
+  // Construction ships: build_cargo_capacity > 0; cargo_capacity = 0; survey fields = 0
+  // Research ships: survey fields > 0; cargo_capacity = 0; build_cargo_capacity = 0; build_work_per_tick = 0
+  cargo_capacity: u32
+  build_cargo_capacity: u32
+  speed_milli: u32
+  max_fuel: u32
+  base_mass: u32
+  build_work_per_tick: u16
+  survey_work_per_tick: u16
+  max_survey_depth: u8
+}
+
+struct StationStats {
+  docks: u8
+  cargo_capacity: u32
+  fuel_capacity: u32
+  production_slots: u8            // 0 for Hub (uses slow assembly slot), 1-4 for Refinery/Construction
+  max_targets: u8                 // Mining only; 0 otherwise
+  extraction_per_target_per_10_ticks: u8  // Mining only; 0 otherwise
+  research_projects: u8           // Research only; always 1; 0 otherwise
+  shipyard_slots: u8              // Hub only; always 1; 0 otherwise
+  component_slots: u8             // Hub only; always 1; 0 otherwise
+}
+
 struct ShipDefinition {
   role: ShipRole
   tier: u8
@@ -474,6 +500,61 @@ struct StationDefinition {
   component_cost: Map<ResourceType, u32>
   required_tech: TechId
 }
-```
+
+struct StartingScenario {
+  // Packages the tick-0 canonical game into a single content record
+  celestial_bodies: Map<BodyId, CelestialBody>
+  stations: Map<StationId, Station>
+  ships: Map<ShipId, Ship>
+  completed_techs: Set<TechId>
+  deployment_kit: Map<ResourceType, u32>   // loose components in Hub Haven output buffers
+  schema_version: u32
+  content_version: string
+  lifecycle: GameLifecycle
+  tick: u64
+  next_server_sequence: u64
+  next_event_sequence: u64
+  id_counters: IdCounters
+  rng_state: RNGState
+}
+
+struct GateDefinition {
+  // Authored content definition for the Space Gate, distinct from runtime GateBuild state
+  site_position: SystemPosition
+  manifest: Map<ResourceType, u32>   // exact cargo required
+  required_techs: TechId[]            // ordered prerequisite techs
+  phase_work: Map<GatePhase, u32>     // work required per phase
+  activation_sink: Map<ResourceType, u32> // consumed atomically on activation
+}
+
+struct AuthoredDefaults {
+  // Default buffer allocation parameters used when a command creates new buffers
+  general_buffer_preferred_maximum: u32     // default 50
+  general_buffer_minimum_multiplier: u8     // default 1 for inputs, 1 for outputs
+  demand_threshold_default: u8             // 100 for input buffers
+  export_threshold_default: u8             // 0 for output buffers
+  fuel_demand_threshold_default: u8        // 20
+  fuel_export_threshold_default: u8        // 50
+  retune_ticks: u16                         // 10
+  research_preferred_capacity: u32         // full outstanding inbound rather than 50
+}
 
 The exact V1 records are catalogued in GDD 14 and mirrored byte-for-byte in versioned content JSON. Startup validation rejects duplicate IDs, cyclic technology prerequisites, unreachable recipes, invalid thresholds, over-capacity buffers, or authored values that do not conform to these shapes.
+
+## Schema Generation Ownership
+
+The machine-readable JSON schemas under `content/` are owned by the Tech Lead and generated from the canonical struct definitions in this document. Specifically:
+
+- `content/definitions.v1.json` — mirrors every `*Definition` struct (Recipe, Tech, Ship, Station, Gate) and supporting types (FacilityRequirement, ShipStats, StationStats, AuthoredDefaults). Schema generation is the responsibility of the engine build process (P1-01) and validated by the content validator (P1-04/P1-05).
+
+- `content/starting_system.v1.json` — mirrors the `StartingScenario` record with exact GDD 14 values for bodies, Hub Haven, Builder-1, starting techs, deployment kit, and root metadata. This file is the canonical input for game creation and bootstrap scenarios.
+
+Schema generation follows these rules:
+
+1. Every `*Definition` struct in this document has a corresponding JSON Schema definition in the generated schema.
+2. Generated JSON Schema uses `"description"` annotations derived from doc comments in the canonical struct definitions.
+3. The schema generator is a Rust crate in the engine workspace that reads the canonical Rust types and emits JSON Schema + TypeScript declarations. Its output is deterministic and snapshot-tested.
+4. Hand-written overrides to the generated schema are not permitted. If the generated schema is incorrect, the canonical Rust type or this document's definition is the source of truth and must be corrected.
+5. `content/` files are versioned alongside the engine binary. A mismatch between `schema_version` and the content schema version is a fatal startup error.
+
+The content validator (P1-04/P1-05) is the runtime gate that confirms every `content/` file conforms to its schema and passes structural/semantic validation before any game can be created.

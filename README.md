@@ -31,6 +31,8 @@
 
 - [`docs/adr/`](docs/adr/) — accepted architectural decisions
 - [`docs/tdd/`](docs/tdd/) — approved Phase 1 implementation design
+- [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) — ordered autonomous implementation backlog and cumulative verification gates
+- [`AGENTS.md`](AGENTS.md) — repository-wide per-turn instructions for implementation agents
 
 ## V1 Scope
 
