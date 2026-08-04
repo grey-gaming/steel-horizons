@@ -454,7 +454,7 @@ Notes: <remaining non-blocking follow-up, if any>
 ```text
 Increment: G0-01
 Date: 2026-08-04
-Commit: 7903e8b
+Commit: 317e05a
 Requirements: GDD 13 §Content Definitions, GDD 13 §Schema Generation Ownership, GDD 14 §Canonical Ship Definitions, GDD 14 §Canonical Station Definitions, GDD 14 §Space Gate Definition, GDD 14 §Automatic Buffer Defaults
 Focused proof: Document consistency check — every new struct field maps to an existing GDD 14 table column or authored value. Future executable proof: P1-02 deserializes ShipStats/StationStats/StartingScenario from content JSON; P1-04/P1-05 validates schema conformance against these shapes; P1-01 schema generator emits JSON Schema from canonical Rust types.
 Cumulative gates: Document consistency verification (see G0-01 evidence in session transcript)
