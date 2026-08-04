@@ -478,7 +478,7 @@ Notes: G0-02 specifies SHA-256 for both content and state hashing, canonical Ser
 ```text
 Increment: G0-03
 Date: 2026-08-04
-Commit: 8565489
+Commit: 88b36f9
 Requirements: ADR-0007 — Save Envelope Format, Content Hash Placement, and Migration Fixtures; GDD 12 §Save, Load, and Replay; GDD 13 §GameState; ADR-0006 §Save File Hash; ADR-0004 §Save Normalization; ADR-0005 §Content Validation Gate, §CI Policy
 Focused proof: Document consistency check — every save-envelope rule in ADR-0007 references existing GDD 13 serialized shapes, GDD 12 persistence semantics, ADR-0006 canonical serialization and hash rules, ADR-0004 lifecycle normalization, and ADR-0005 content validation policy. No contradiction with any existing ADR, GDD, or TDD. Future executable proof: P1-13 validates save/load round-trip with state-hash integrity and schema migration; P1-13 also verifies migration fixtures against golden hashes.
 Cumulative gates: Document consistency verification (cross-reference check against GDD 12 §Save Load and Replay, GDD 13 §GameState/GameSnapshot, ADR-0006 §Save File Hash, ADR-0004 §Save Normalization, ADR-0005 §Content Validation Gate, ADR-0003 §Command Envelope)
