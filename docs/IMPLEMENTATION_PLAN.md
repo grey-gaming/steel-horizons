@@ -588,7 +588,7 @@ Notes: Audit repair stages REST at P1-14, polling at P1-31, WebSocket at P1-32, 
 ```text
 Increment: P1-01
 Date: 2026-08-05
-Commit: 6cbdb73
+Commit: bb27b4f
 Requirements: TDD 04 §Quality Gates (P1-01 row); TDD 05 §Repository Layout, §CI Staging and Matrix, §Python CI; AGENTS.md §Verification order
 Focused proof: `cargo build --locked`, `cargo fmt --check`, `cargo clippy --locked -- -D warnings`, `cargo test --locked`, `python3 scripts/check-protocol-sync.py`, `ruff check src/`, `mypy src/`, `steel-horizons-engine --version`
 Cumulative gates: P1-01 gate set — all passed.
