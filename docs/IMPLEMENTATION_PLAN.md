@@ -152,7 +152,7 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
   - Verify: clean locked build, one Rust test, one Python scaffold test, formatter/linter gates, protocol/policy-sync checks, and `steel-horizons-engine --version`.
   - Depends on: G0-09.
 
-- [ ] **P1-02a — Primitive protocol/domain vocabulary.**
+- [x] **P1-02a — Primitive protocol/domain vocabulary.**
   - Deliver: ID newtypes, `ResourceType`, lanes, lifecycle, entity-role/state enums, explicit Serde tags, and deterministic `Ord` implementations.
   - Verify: serialization snapshots, enum/newtype round trips, stable resource order, invalid/unknown-field cases.
   - Depends on: G0-01, P1-01.
@@ -499,6 +499,18 @@ Cumulative gates: Common Gate 0 document audit — passed.
 Scenarios activated: none (doc-only Gate 0)
 Golden/hash changes: none; the first executable goldens are owned by P1-05/P1-08.
 Notes: Audit repair replaces nonexistent library “canonical modes” with project-owned canonical JSON v1, domain-separated SHA-256, explicit snake_case/null/duplicate/float rules, recursive lexicographic object ordering, typed failures, and exact content/scenario/replay-equivalence/save-integrity projections.
+```
+
+```text
+Increment: P1-02a
+Date: 2026-08-05
+Commit: 20770e8
+Requirements: GDD 13 §Identifiers and Resources, §Entity Enums, §Lanes, §Lifecycle, §Destination References, §Build Targets/States, §Research, §Survey Orders, §Reservations, §Gate, §Commands; GDD 14 §Canonical Refining Recipes (resource order)
+Focused proof: `cargo test --locked` — 29 tests covering serialization round trips (all variants of state enums, tagged enums, ID newtypes), stable resource/lane ordering, unknown-field rejection, missing-variant-field rejection, ErrorDetail variant round trips, CommandRejection round trip, and empty-string ID.
+Cumulative gates: `cargo fmt --check` (clean), `cargo build --locked` (clean), `cargo clippy --locked -- -D warnings` (clean), `cargo test --locked` (29/29 pass).
+Scenarios activated: none (primitive types only)
+Golden/hash changes: none
+Notes: Review subagent flagged TransportStage having no direct round-trip test and thin variant coverage. Both addressed before commit: added TransportStage round-trip test and comprehensive all-variant round-trip tests for BuildState, ResearchState, SurveyOrderState, ReservationState, GatePhase, and ResearchPauseReason.
 ```
 
 ```text

@@ -22,6 +22,9 @@ pub mod prng;
 /// Identity types for entities, resources, and commands.
 pub mod id;
 
+/// Primitive protocol/domain vocabulary (resource types, lanes, enums).
+pub mod types;
+
 /// Root simulation state and canonical tick-zero constructor.
 pub mod state;
 
