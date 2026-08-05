@@ -172,7 +172,7 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
   - Verify: table-driven invalid fixtures, each with stable path and typed failure.
   - Depends on: P1-03.
 
-- [ ] **P1-05 — Content validator: semantic rules and content hash.**
+- [x] **P1-05 — Content validator: semantic rules and content hash.**
   - Deliver: technology DAG, unlock/recipe/facility reachability, inverse-recipe equality, cost/build-hold rules, critical-resource budget, normalized representation, and versioned content hash.
   - Verify: cycle/unreachable/budget/inverse negative fixtures and stable content-hash golden. Executable bootstrap validation is added in P1-19 when the simulation exists.
   - Depends on: G0-02, P1-04.
@@ -643,4 +643,16 @@ Cumulative gates: `cargo fmt --check` (clean), `cargo build --locked` (clean), `
 Scenarios activated: none (content-validation-only increment)
 Golden/hash changes: none
 Notes: Independent review completed. Dead code removed from `validate_gate_definition` (unused `expected_phases` array, `_pname`, empty if block). Added structural validation for Gate fields (`required_techs`, `manifest`, `logistics_priority`, `transfer_berths`, `minimum_fabricator_tier`, `required_deliveries`, `completion_consumption`). Added validation for `build_work`, `component_cost`, and `required_tech` on ship and station definitions. 8 new invalid-fixture tests cover these validation paths. Fixed pre-existing unused-variable warning (`sid` → `_sid`).
+```
+
+```text
+Increment: P1-05
+Date: 2026-08-05
+Commit: (pending — commit after review)
+Requirements: GDD 13 §Content Definitions (normalized representation); GDD 14 §Authored Content & Balance Catalog, §Solvability Budget; ADR-0006 §Canonical JSON v1 byte encoding, §Collection ordering, §Domain separation prefixes, §Canonical content hash input; ADR-0005 §Content Validation Gate
+Focused proof: `cargo test --lib` — 155 tests covering canonical JSON writer (13 tests), content hash computation (4 tests), existing content/state/type/command tests (128 tests), and 6 new P1-05 semantic fixture tests (tech DAG cycle, unknown required tech, inverse recipe mismatch, zero-quantity component cost, build hold exceeds cargo, critical resource budget). Canonical content validates with zero errors.
+Cumulative gates: `cargo clippy` (clean), `cargo build` (clean), `cargo test --lib` (155/155 pass)
+Scenarios activated: none (validation-only increment)
+Golden/hash changes: `tests/goldens/content_hash.txt` — new golden for content hash `667407ea914272134aa9495b46c527191ec0e6987a6e410e6f18597413474972`
+Notes: Independent review completed via delegated subagent (deleg_ef6a4342). All 10 review points confirmed passing with no issues. New modules: `engine/src/canonical.rs` (canonical JSON v1 writer), `engine/src/content_hash.rs` (SHA-256 content hash with domain separation). New semantic validators added to `content_validate.rs`: tech DAG cycle detection, required tech reachability, inverse-recipe equality, zero-cost component checks, build hold vs cargo capacity, and critical-resource budget. Construction ships exempted from build-hold check (zero cargo capacity by design). sha2 dependency added to Cargo.toml.
 ```

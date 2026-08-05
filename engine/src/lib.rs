@@ -40,5 +40,11 @@ pub mod content;
 /// Content validation — structural and semantic rules.
 pub mod content_validate;
 
+/// Canonical JSON v1 writer — ADR-0006 deterministic encoding.
+pub mod canonical;
+
+/// Content hash computation — ADR-0006 canonical content digest.
+pub mod content_hash;
+
 /// Convenience re-export of the engine version.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

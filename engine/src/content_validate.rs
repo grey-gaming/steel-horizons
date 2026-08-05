@@ -17,6 +17,7 @@
 
 #![allow(missing_docs)]
 
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fmt;
 
@@ -91,6 +92,13 @@ fn validate_definitions(defs: &DefinitionsCatalog, errors: &mut Vec<ContentValid
     validate_tech_cost_nonzero(defs, errors);
     validate_gate_definition(defs, errors);
     validate_authored_namespace(defs, errors);
+    // P1-05 semantic validations
+    validate_tech_dag(defs, errors);
+    validate_recipe_required_techs_exist(defs, errors);
+    validate_inverse_recipes(defs, errors);
+    validate_component_costs(defs, errors);
+    validate_build_hold_not_exceeds_capacity(defs, errors);
+    validate_critical_resource_budget(defs, errors);
 }
 
 fn validate_recipe_ids(defs: &DefinitionsCatalog, errors: &mut Vec<ContentValidationError>) {
@@ -982,6 +990,332 @@ impl ResourceType {
     }
 }
 
+// ─── Semantic validation (P1-05) ───────────────────────────────────────
+
+/// Detect cycles in the technology prerequisite DAG.
+///
+/// Uses a simple topological-sort approach: compute in-degree for each tech
+/// from its prerequisites, then walk.  Any tech remaining after the walk is
+/// part of a cycle.
+fn validate_tech_dag(defs: &DefinitionsCatalog, errors: &mut Vec<ContentValidationError>) {
+    let tech_ids: BTreeSet<&TechId> = defs.technologies.iter().map(|t| &t.id).collect();
+
+    // Kahn's algorithm for topological sort
+    // Build adjacency: prereq -> t means t depends on prereq
+    let mut in_deg: BTreeMap<&TechId, usize> = BTreeMap::new();
+    let mut edges: BTreeMap<&TechId, Vec<&TechId>> = BTreeMap::new();
+
+    for t in &defs.technologies {
+        let prereq_count = t.prerequisites.len();
+        *in_deg.entry(&t.id).or_insert(0) += prereq_count;
+        for prereq in &t.prerequisites {
+            // Edge prereq -> t
+            edges.entry(prereq).or_default().push(&t.id);
+        }
+    }
+
+    // Kahn's algorithm — collect initial zero-degree techs separately
+    let mut queue: Vec<&&TechId> = in_deg
+        .iter()
+        .filter(|(_, &deg)| deg == 0)
+        .map(|(id, _)| id)
+        .collect();
+
+    let mut processed = 0usize;
+    // Use indices instead of references to avoid borrow conflicts
+    let mut deg_copy: BTreeMap<&TechId, usize> = in_deg.iter().map(|(k, &v)| (*k, v)).collect();
+    while let Some(id) = queue.pop() {
+        processed += 1;
+        if let Some(succ) = edges.get(id) {
+            for next in succ {
+                let deg = deg_copy.get_mut(next).expect("tech must be in in_deg");
+                *deg = deg.saturating_sub(1);
+                if *deg == 0 {
+                    queue.push(next);
+                }
+            }
+        }
+    }
+
+    if processed != tech_ids.len() {
+        let unprocessed: Vec<&&TechId> = in_deg
+            .iter()
+            .filter(|(_, &deg)| deg > 0)
+            .map(|(id, _)| id)
+            .collect();
+        for id in &unprocessed {
+            let path = format!("definitions.technologies.{}.prerequisites", id.0);
+            push_err!(
+                errors,
+                path,
+                "technology '{}' is part of a prerequisite cycle",
+                id.0
+            );
+        }
+    }
+}
+
+/// Validate that every recipe's `required_tech` (if set) references a known tech.
+fn validate_recipe_required_techs_exist(
+    defs: &DefinitionsCatalog,
+    errors: &mut Vec<ContentValidationError>,
+) {
+    let tech_ids: BTreeSet<&TechId> = defs.technologies.iter().map(|t| &t.id).collect();
+    for (i, r) in defs.recipes.iter().enumerate() {
+        if let Some(ref req) = r.required_tech {
+            if !tech_ids.contains(req) {
+                push_err!(
+                    errors,
+                    format!("definitions.recipes[{}].required_tech", i),
+                    "recipe '{}' references unknown required tech '{}'",
+                    r.id.0,
+                    req.0
+                );
+            }
+        }
+    }
+}
+
+/// Validate inverse-recipe equality.
+///
+/// Every disassembly recipe must be the exact inverse of its assembly
+/// counterpart: the disassembly consumes the assembly's one output unit
+/// and returns the assembly's complete input map.
+fn validate_inverse_recipes(defs: &DefinitionsCatalog, errors: &mut Vec<ContentValidationError>) {
+    let assembly_map: BTreeMap<String, &RecipeDefinition> = defs
+        .recipes
+        .iter()
+        .filter(|r| r.id.0.starts_with("assemble_"))
+        .map(|r| (r.id.0.clone(), r))
+        .collect();
+
+    for (i, r) in defs.recipes.iter().enumerate() {
+        if !r.id.0.starts_with("disassemble_") {
+            continue;
+        }
+        let assembly_id = format!("assemble_{}", &r.id.0[12..]);
+        let assembly = match assembly_map.get(&assembly_id) {
+            Some(a) => a,
+            None => continue,
+        };
+
+        let rpath = format!("definitions.recipes[{}]", i);
+
+        if r.outputs != assembly.inputs {
+            push_err!(
+                errors,
+                format!("{}.outputs", rpath),
+                "disassembly recipe '{}' outputs {:?} don't match assembly '{}' inputs {:?}",
+                r.id.0,
+                r.outputs,
+                assembly_id,
+                assembly.inputs
+            );
+        }
+
+        if r.inputs != assembly.outputs {
+            push_err!(
+                errors,
+                format!("{}.inputs", rpath),
+                "disassembly recipe '{}' inputs {:?} don't match assembly '{}' outputs {:?}",
+                r.id.0,
+                r.inputs,
+                assembly_id,
+                assembly.outputs
+            );
+        }
+
+        if r.facilities != assembly.facilities {
+            push_err!(
+                errors,
+                format!("{}.facilities", rpath),
+                "disassembly recipe '{}' facilities don't match assembly '{}'",
+                r.id.0,
+                assembly_id
+            );
+        }
+
+        if r.required_tech != assembly.required_tech {
+            push_err!(
+                errors,
+                format!("{}.required_tech", rpath),
+                "disassembly recipe '{}' required_tech doesn't match assembly '{}'",
+                r.id.0,
+                assembly_id
+            );
+        }
+    }
+}
+
+/// Validate that component costs in ship/station definitions reference
+/// valid resources (non-zero quantity).
+fn validate_component_costs(defs: &DefinitionsCatalog, errors: &mut Vec<ContentValidationError>) {
+    for (i, s) in defs.ships.iter().enumerate() {
+        let path = format!("definitions.ships[{}]", i);
+        for (&res, &qty) in &s.component_cost {
+            if qty == 0 {
+                push_err!(
+                    errors,
+                    format!("{}.component_cost.{}", path, res.variant_name()),
+                    "ship {:?} T{} has zero-quantity component cost for {}",
+                    s.role,
+                    s.tier,
+                    res.variant_name()
+                );
+            }
+        }
+    }
+    for (i, s) in defs.stations.iter().enumerate() {
+        let path = format!("definitions.stations[{}]", i);
+        for (&res, &qty) in &s.component_cost {
+            if qty == 0 {
+                push_err!(
+                    errors,
+                    format!("{}.component_cost.{}", path, res.variant_name()),
+                    "station {:?} T{} has zero-quantity component cost for {}",
+                    s.station_type,
+                    s.tier,
+                    res.variant_name()
+                );
+            }
+        }
+    }
+}
+
+/// Validate that `build_cargo_capacity` does not exceed `cargo_capacity` for
+/// each ship definition.
+///
+/// Construction ships have zero cargo capacity by design — they exclusively use
+/// their build-hold for construction materials.  Skip them.
+fn validate_build_hold_not_exceeds_capacity(
+    defs: &DefinitionsCatalog,
+    errors: &mut Vec<ContentValidationError>,
+) {
+    for (i, s) in defs.ships.iter().enumerate() {
+        if s.role == crate::types::ShipRole::Construction {
+            continue;
+        }
+        let path = format!("definitions.ships[{}]", i);
+        if s.stats.build_cargo_capacity > s.stats.cargo_capacity {
+            push_err!(
+                errors,
+                format!("{}.stats.build_cargo_capacity", path),
+                "ship {:?} T{} build_cargo_capacity {} exceeds cargo_capacity {}",
+                s.role,
+                s.tier,
+                s.stats.build_cargo_capacity,
+                s.stats.cargo_capacity
+            );
+        }
+    }
+}
+
+/// Validate the critical-resource solvability budget per GDD 14 §Solvability Budget.
+fn validate_critical_resource_budget(
+    defs: &DefinitionsCatalog,
+    errors: &mut Vec<ContentValidationError>,
+) {
+    let mut rare_tech: u64 = 0;
+    let mut helium_tech: u64 = 0;
+    let mut crystal_tech: u64 = 0;
+
+    for t in &defs.technologies {
+        for (&res, &qty) in &t.costs {
+            let q = qty as u64;
+            match res {
+                ResourceType::RareEarthMinerals => rare_tech += q,
+                ResourceType::Helium3 => helium_tech += q,
+                ResourceType::CrystalDeposits => crystal_tech += q,
+                _ => {}
+            }
+        }
+    }
+
+    let mut rare_gate: u64 = 0;
+    let mut helium_gate: u64 = 0;
+    let mut crystal_gate: u64 = 0;
+
+    let gate = &defs.gate;
+    for (&res, &qty) in &gate.manifest {
+        let q = qty as u64;
+        match res {
+            ResourceType::RareEarthMinerals => rare_gate += q,
+            ResourceType::Helium3 => helium_gate += q,
+            ResourceType::CrystalDeposits => crystal_gate += q,
+            _ => {}
+        }
+    }
+    for phase in &gate.phases {
+        for (&res, &qty) in &phase.required_deliveries {
+            let q = qty as u64;
+            match res {
+                ResourceType::RareEarthMinerals => rare_gate += q,
+                ResourceType::Helium3 => helium_gate += q,
+                ResourceType::CrystalDeposits => crystal_gate += q,
+                _ => {}
+            }
+        }
+    }
+
+    let total_rare = rare_tech + rare_gate;
+    let total_helium = helium_tech + helium_gate;
+    let total_crystal = crystal_tech + crystal_gate;
+
+    if total_rare > 1600 {
+        push_err!(
+            errors,
+            "definitions.critical_resource_budget.rareEarthMinerals",
+            "total RareEarthMinerals budget {} exceeds authored finite amount 1600",
+            total_rare
+        );
+    }
+    if total_helium > 1000 {
+        push_err!(
+            errors,
+            "definitions.critical_resource_budget.helium3",
+            "total Helium3 budget {} exceeds authored finite amount 1000",
+            total_helium
+        );
+    }
+    if total_crystal > 1000 {
+        push_err!(
+            errors,
+            "definitions.critical_resource_budget.crystalDeposits",
+            "total CrystalDeposits budget {} exceeds authored finite amount 1000",
+            total_crystal
+        );
+    }
+
+    let tech_rare = rare_tech;
+    let tech_helium = helium_tech;
+    let tech_crystal = crystal_tech;
+
+    if tech_rare + rare_gate > 725 {
+        push_err!(
+            errors,
+            "definitions.critical_resource_budget.rareEarthMinerals",
+            "tech+gate RareEarthMinerals budget {} exceeds validated maximum 725",
+            tech_rare + rare_gate
+        );
+    }
+    if tech_helium + helium_gate > 350 {
+        push_err!(
+            errors,
+            "definitions.critical_resource_budget.helium3",
+            "tech+gate Helium3 budget {} exceeds validated maximum 350",
+            tech_helium + helium_gate
+        );
+    }
+    if tech_crystal + crystal_gate > 400 {
+        push_err!(
+            errors,
+            "definitions.critical_resource_budget.crystalDeposits",
+            "tech+gate CrystalDeposits budget {} exceeds validated maximum 400",
+            tech_crystal + crystal_gate
+        );
+    }
+}
+
 // ─── Tests ─────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -1592,6 +1926,137 @@ mod tests {
                 .iter()
                 .any(|e| e.message.contains("minimum_fabricator_tier")),
             "expected minimum_fabricator_tier zero error, got: {:?}",
+            errors
+        );
+    }
+
+    // ─── P1-05 semantic validation fixture tests ────────────────────────
+
+    /// Fixture: technology prerequisite cycle.
+    #[test]
+    fn invalid_tech_prerequisite_cycle() {
+        let mut defs: DefinitionsCatalog = load_json("definitions.v1.json");
+        // Create a simple cycle: tech A -> tech B -> tech A
+        let tech_a_id = TechId("test_tech_a".into());
+        let tech_b_id = TechId("test_tech_b".into());
+        defs.technologies.push(TechDefinition {
+            id: tech_a_id.clone(),
+            tier: 0,
+            prerequisites: vec![tech_b_id.clone()],
+            costs: Default::default(),
+            duration_ticks: 0,
+            mechanic_unlocks: vec![],
+        });
+        defs.technologies.push(TechDefinition {
+            id: tech_b_id.clone(),
+            tier: 0,
+            prerequisites: vec![tech_a_id.clone()],
+            costs: Default::default(),
+            duration_ticks: 0,
+            mechanic_unlocks: vec![],
+        });
+        let scenario: StartingScenario = load_json("starting_system.v1.json");
+        let errors = validate_content(&defs, &scenario);
+        assert!(
+            errors.iter().any(|e| e.message.contains("prerequisite cycle")),
+            "expected prerequisite cycle error, got: {:?}",
+            errors
+        );
+    }
+
+    /// Fixture: recipe references unknown required tech.
+    #[test]
+    fn invalid_recipe_unknown_required_tech() {
+        let mut defs: DefinitionsCatalog = load_json("definitions.v1.json");
+        defs.recipes[0].required_tech = Some(TechId("nonexistent_tech".into()));
+        let scenario: StartingScenario = load_json("starting_system.v1.json");
+        let errors = validate_content(&defs, &scenario);
+        assert!(
+            errors.iter().any(|e| e.message.contains("unknown required tech")),
+            "expected unknown required tech error, got: {:?}",
+            errors
+        );
+    }
+
+    /// Fixture: inverse recipe mismatch (disassembly outputs != assembly inputs).
+    #[test]
+    fn invalid_inverse_recipe_mismatch() {
+        let mut defs: DefinitionsCatalog = load_json("definitions.v1.json");
+        // Find a disassembly recipe and modify its outputs to break the inverse
+        let dis_idx = defs
+            .recipes
+            .iter()
+            .position(|r| r.id.0.starts_with("disassemble_"));
+        if let Some(idx) = dis_idx {
+            // Clone the outputs first to avoid borrow conflict
+            let first_output = defs.recipes[idx].outputs.iter().next().map(|(&k, &v)| (k, v));
+            if let Some((k, v)) = first_output {
+                defs.recipes[idx].outputs.insert(k, v.saturating_add(1));
+            }
+        }
+        let scenario: StartingScenario = load_json("starting_system.v1.json");
+        let errors = validate_content(&defs, &scenario);
+        assert!(
+            errors.iter().any(|e| e.message.contains("disassembly") && e.message.contains("don't match")),
+            "expected inverse recipe mismatch error, got: {:?}",
+            errors
+        );
+    }
+
+    /// Fixture: ship with zero-quantity component cost.
+    #[test]
+    fn invalid_zero_quantity_component_cost() {
+        let mut defs: DefinitionsCatalog = load_json("definitions.v1.json");
+        let first_cost = defs.ships[0].component_cost.iter().next().map(|(&k, &v)| (k, v));
+        if let Some((res, _)) = first_cost {
+            defs.ships[0].component_cost.insert(res, 0);
+        }
+        let scenario: StartingScenario = load_json("starting_system.v1.json");
+        let errors = validate_content(&defs, &scenario);
+        assert!(
+            errors.iter().any(|e| e.message.contains("zero-quantity")),
+            "expected zero-quantity component cost error, got: {:?}",
+            errors
+        );
+    }
+
+    /// Fixture: non-Construction ship with build_cargo_capacity > cargo_capacity.
+    #[test]
+    fn invalid_build_hold_exceeds_cargo() {
+        let mut defs: DefinitionsCatalog = load_json("definitions.v1.json");
+        // Find a non-Construction ship and set build_hold > cargo
+        for ship in &mut defs.ships {
+            if ship.role != crate::types::ShipRole::Construction {
+                ship.stats.build_cargo_capacity = ship.stats.cargo_capacity + 100;
+                break;
+            }
+        }
+        let scenario: StartingScenario = load_json("starting_system.v1.json");
+        let errors = validate_content(&defs, &scenario);
+        assert!(
+            errors.iter().any(|e| e.message.contains("build_cargo_capacity") && e.message.contains("exceeds")),
+            "expected build_hold exceeds cargo error, got: {:?}",
+            errors
+        );
+    }
+
+    /// Fixture: critical resource budget exceeds authored finite amount.
+    #[test]
+    fn invalid_critical_resource_budget() {
+        let mut defs: DefinitionsCatalog = load_json("definitions.v1.json");
+        // Artificially inflate a tech cost for a critical resource
+        for tech in &mut defs.technologies {
+            if tech.costs.contains_key(&ResourceType::RareEarthMinerals) {
+                let cost = tech.costs.get(&ResourceType::RareEarthMinerals).unwrap();
+                tech.costs.insert(ResourceType::RareEarthMinerals, cost + 10_000);
+                break;
+            }
+        }
+        let scenario: StartingScenario = load_json("starting_system.v1.json");
+        let errors = validate_content(&defs, &scenario);
+        assert!(
+            errors.iter().any(|e| e.message.contains("RareEarthMinerals") && e.message.contains("budget")),
+            "expected critical resource budget error, got: {:?}",
             errors
         );
     }

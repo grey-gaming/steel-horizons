@@ -27,6 +27,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 schemars = { workspace = true }
+sha2 = "0.10"
 
 [dev-dependencies]
 proptest = { workspace = true }
