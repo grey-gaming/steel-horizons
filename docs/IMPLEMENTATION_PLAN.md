@@ -162,7 +162,7 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
   - Verify: full DTO round trips; explicit null/empty collection fixtures; root-schema snapshots; duplicate/unknown/missing-field rejection; regeneration has no diff.
   - Depends on: G0-04–G0-08, P1-02a.
 
-- [ ] **P1-03 — Canonical content files.**
+- [x] **P1-03 — Canonical content files.**
   - Deliver: `content/definitions.v1.json`, `content/starting_system.v1.json`, and the two reproducibly generated `schemas/content/*.schema.json` artifacts transcribed from GDD 14/GDD 13.
   - Verify: schema regeneration has no diff; exact record/count/value fixtures cover 25 resource types, seven bodies, 19 slots, 27 recipes (11 refining, eight assembly, eight inverse), 23 technologies, 12 ship definitions, 20 station definitions, starting metadata/inventory/explicit fields, typed mechanic unlocks, build-work/default constants, and Gate values.
   - Depends on: P1-02b.
@@ -516,7 +516,7 @@ Notes: Review subagent flagged TransportStage having no direct round-trip test a
 ```text
 Increment: P1-02b
 Date: 2026-08-05
-Commit: <pending>
+Commit: 55a9807
 Requirements: GDD 13 §Content Definitions, §Serialized State DTOs, §Commands, §Schema Generation Ownership; GDD 13 §Identifiers and Resources (id newtype JsonSchema); GDD 13 §Entity Enums, §Lanes, §Lifecycle, §Destination References, §Build Targets/States, §Research, §Survey Orders, §Reservations, §Gate, §Commands (types JsonSchema)
 Focused proof: `cargo run -p steel-horizons-engine --bin schema_export -- <tmpdir>` — 35 JSON Schema files generated for every root DTO. Round-trip tests added for every state DTO (SystemPosition, TravelSegment, TravelPlan, Buffer, ProductionSlot, MiningTarget, Station, Ship, ResourceDeposit, CelestialBody, RationalRemainder, ResearchProject, SurveyOrder, BuildOrder, SalvageCache, GateBuild, Reservation, BottleneckTracker, RNGState, IdCounters, CommandRecord, GameState, GameSnapshot) and every command DTO (BufferConfiguration variants, ActorControl variants, ReplayableGameCommand variants, CommandEnvelope, CommandAcknowledgement).
 Cumulative gates: `cargo fmt --check` (clean), `cargo build --locked` (clean), `cargo clippy --locked -- -D warnings` (clean), `cargo test --locked` (29/29 pass), schema export binary (35 schemas generated, deterministic across runs)
@@ -619,4 +619,16 @@ Cumulative gates: P1-01 gate set — all passed.
 Scenarios activated: none (P1-01 scaffold)
 Golden/hash changes: none (no golden tests yet)
 Notes: Independent review completed via delegated subagent (deleg_400e18c2). One minor fix applied: check.sh/check.ps1 pytest --co fallback message clarified. All verification gates pass cleanly.
+```
+
+```text
+Increment: P1-03
+Date: 2026-08-05
+Commit: 4877f09
+Requirements: GDD 13 §Content Definitions, §Serialized State DTOs; GDD 14 §Authored Content & Balance Catalog (complete starting bodies, deposits, recipes, technologies, ship/station statistics, Gate definition); TDD 04 §Quality Gates
+Focused proof: `content/definitions.v1.json` parses as `DefinitionsCatalog` and round-trips; `content/starting_system.v1.json` parses as `StartingScenario` and round-trips; `ContentCatalog` round-trips from both files. Exact record counts: 27 recipes, 23 technologies, 12 ships, 20 stations, 7 bodies, 19 slots, 4 starting techs, 6 stations with authored buffers/ship/states. Hub Haven output buffers in ResourceType order. RNG words match GDD 14 authoritative hex values. Schema regeneration is deterministic with no diff.
+Cumulative gates: `cargo fmt --check` (clean), `cargo build --locked` (clean), `cargo clippy --locked -- -D warnings` (clean), `cargo test --locked` (99/99 pass), schema export `--check` (no diff)
+Scenarios activated: none (content/schema-only increment)
+Golden/hash changes: none (content files are versioned authored data; schemas are deterministic)
+Notes: Independent review completed via delegated subagent (deleg_a358ade3). One bug found and fixed: RNG words in starting_system.v1.json did not match GDD 14 hex values; corrected to authoritative decimal representations. Schema-export.sh updated with `--check` flag. 16 focused tests validate round-trip, record counts, ID uniqueness, body counts, slot totals, hub buffers, ship state, techs, metadata, gate definition, and recipe tech validity.
 ```

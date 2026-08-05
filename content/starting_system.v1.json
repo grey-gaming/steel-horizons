@@ -1,0 +1,259 @@
+{
+  "id": "starting_system",
+  "content_version": "v1",
+  "lifecycle": "paused",
+  "tick": 0,
+  "next_server_sequence": 1,
+  "next_event_sequence": 1,
+  "id_counters": {
+    "ship": 1,
+    "station": 1,
+    "build_order": 1,
+    "reservation": 1,
+    "salvage": 1,
+    "survey_order": 1
+  },
+  "rng_state": {
+    "words": [
+      2611923443488327891,
+      1376283091369227076,
+      11820040416388919760,
+      589684135938649225
+    ]
+  },
+  "celestial_bodies": {
+    "planet_haven": {
+      "id": "planet_haven",
+      "name": "Haven",
+      "body_type": "planet",
+      "subtype": "rockyTerran",
+      "parent_body_id": null,
+      "position": {
+        "lane_id": "habitable",
+        "radius_units": 1200,
+        "angle_milli": 0
+      },
+      "survey_depth": 3,
+      "deposits": [
+        { "resource": "metalOre", "current": 4000, "baseline": 4000, "renewable": false, "minimum_survey_depth": 1 },
+        { "resource": "carbonSoil", "current": 3000, "baseline": 3000, "renewable": false, "minimum_survey_depth": 1 },
+        { "resource": "siliconDust", "current": 2500, "baseline": 2500, "renewable": false, "minimum_survey_depth": 1 }
+      ],
+      "orbit_ring_count": 3,
+      "slot_counts": [3, 2, 1]
+    },
+    "planet_pyre": {
+      "id": "planet_pyre",
+      "name": "Pyre",
+      "body_type": "planet",
+      "subtype": "volcanic",
+      "parent_body_id": null,
+      "position": {
+        "lane_id": "inner",
+        "radius_units": 600,
+        "angle_milli": 3140
+      },
+      "survey_depth": 0,
+      "deposits": [
+        { "resource": "volcanicSulfur", "current": 1800, "baseline": 1800, "renewable": false, "minimum_survey_depth": 1 },
+        { "resource": "rareEarthMinerals", "current": 1200, "baseline": 1200, "renewable": false, "minimum_survey_depth": 1 },
+        { "resource": "crystalDeposits", "current": 500, "baseline": 500, "renewable": false, "minimum_survey_depth": 2 }
+      ],
+      "orbit_ring_count": 2,
+      "slot_counts": [2, 1]
+    },
+    "planet_boreas": {
+      "id": "planet_boreas",
+      "name": "Boreas",
+      "body_type": "planet",
+      "subtype": "iceWorld",
+      "parent_body_id": null,
+      "position": {
+        "lane_id": "outer",
+        "radius_units": 2800,
+        "angle_milli": 4710
+      },
+      "survey_depth": 0,
+      "deposits": [
+        { "resource": "waterIce", "current": 2500, "baseline": 2500, "renewable": false, "minimum_survey_depth": 1 },
+        { "resource": "frozenGases", "current": 1500, "baseline": 1500, "renewable": false, "minimum_survey_depth": 1 },
+        { "resource": "carbonSoil", "current": 800, "baseline": 800, "renewable": false, "minimum_survey_depth": 2 }
+      ],
+      "orbit_ring_count": 2,
+      "slot_counts": [2, 1]
+    },
+    "planet_titan": {
+      "id": "planet_titan",
+      "name": "Titan",
+      "body_type": "planet",
+      "subtype": "gasGiant",
+      "parent_body_id": null,
+      "position": {
+        "lane_id": "outer",
+        "radius_units": 3200,
+        "angle_milli": 1570
+      },
+      "survey_depth": 0,
+      "deposits": [],
+      "orbit_ring_count": 0,
+      "slot_counts": []
+    },
+    "moon_rime": {
+      "id": "moon_rime",
+      "name": "Rime",
+      "body_type": "moon",
+      "subtype": "iceWorld",
+      "parent_body_id": "planet_titan",
+      "position": {
+        "lane_id": "outer",
+        "radius_units": 3250,
+        "angle_milli": 1870
+      },
+      "survey_depth": 0,
+      "deposits": [
+        { "resource": "helium3", "current": 1000, "baseline": 1000, "renewable": false, "minimum_survey_depth": 1 },
+        { "resource": "rareEarthMinerals", "current": 400, "baseline": 400, "renewable": false, "minimum_survey_depth": 2 }
+      ],
+      "orbit_ring_count": 1,
+      "slot_counts": [2]
+    },
+    "moon_glint": {
+      "id": "moon_glint",
+      "name": "Glint",
+      "body_type": "moon",
+      "subtype": "rockyTerran",
+      "parent_body_id": "planet_titan",
+      "position": {
+        "lane_id": "outer",
+        "radius_units": 3300,
+        "angle_milli": 5670
+      },
+      "survey_depth": 0,
+      "deposits": [
+        { "resource": "crystalDeposits", "current": 500, "baseline": 500, "renewable": false, "minimum_survey_depth": 1 },
+        { "resource": "metalOre", "current": 600, "baseline": 600, "renewable": false, "minimum_survey_depth": 1 }
+      ],
+      "orbit_ring_count": 1,
+      "slot_counts": [1]
+    },
+    "belt_veil": {
+      "id": "belt_veil",
+      "name": "The Veil",
+      "body_type": "asteroidBelt",
+      "subtype": null,
+      "parent_body_id": null,
+      "position": {
+        "lane_id": "inner",
+        "radius_units": 900,
+        "angle_milli": 0
+      },
+      "survey_depth": 0,
+      "deposits": [
+        { "resource": "metalOre", "current": 2000, "baseline": 2000, "renewable": true, "minimum_survey_depth": 1 },
+        { "resource": "carbonSoil", "current": 1200, "baseline": 1200, "renewable": true, "minimum_survey_depth": 1 },
+        { "resource": "siliconDust", "current": 800, "baseline": 800, "renewable": true, "minimum_survey_depth": 1 },
+        { "resource": "crystalDeposits", "current": 300, "baseline": 300, "renewable": true, "minimum_survey_depth": 2 },
+        { "resource": "waterIce", "current": 800, "baseline": 800, "renewable": true, "minimum_survey_depth": 2 },
+        { "resource": "frozenGases", "current": 600, "baseline": 600, "renewable": true, "minimum_survey_depth": 2 },
+        { "resource": "volcanicSulfur", "current": 400, "baseline": 400, "renewable": true, "minimum_survey_depth": 2 }
+      ],
+      "orbit_ring_count": 2,
+      "slot_counts": [2, 2]
+    }
+  },
+  "stations": {
+    "hub_haven": {
+      "id": "hub_haven",
+      "display_name": "Hub Haven",
+      "station_type": "hub",
+      "tier": 1,
+      "body_id": "planet_haven",
+      "orbit_ring": 0,
+      "slot": 0,
+      "input_buffers": [],
+      "output_buffers": [
+        { "resource": "structuralFrame", "current": 6, "max": 6, "demand_threshold": 0, "export_threshold": 0 },
+        { "resource": "powerCore", "current": 4, "max": 4, "demand_threshold": 0, "export_threshold": 0 },
+        { "resource": "controlSystem", "current": 1, "max": 1, "demand_threshold": 0, "export_threshold": 0 },
+        { "resource": "driveAssembly", "current": 3, "max": 3, "demand_threshold": 0, "export_threshold": 0 },
+        { "resource": "cargoModule", "current": 2, "max": 2, "demand_threshold": 0, "export_threshold": 0 },
+        { "resource": "researchLab", "current": 2, "max": 2, "demand_threshold": 0, "export_threshold": 0 },
+        { "resource": "constructionBay", "current": 1, "max": 1, "demand_threshold": 0, "export_threshold": 0 }
+      ],
+      "fuel_buffer": {
+        "resource": "fuel",
+        "current": 200,
+        "max": 200,
+        "demand_threshold": 20,
+        "export_threshold": 50
+      },
+      "total_cargo_capacity": 200,
+      "priority": 50,
+      "installed_components": {
+        "structuralFrame": 1,
+        "powerCore": 1,
+        "controlSystem": 1,
+        "cargoModule": 1
+      },
+      "docked_ship_ids": ["ship_builder_1"],
+      "holding_ship_ids": [],
+      "max_docks": 2,
+      "production_slots": [
+        {
+          "recipe_id": null,
+          "state": "idle",
+          "reserved_inputs": {},
+          "progress_ticks": 0,
+          "total_ticks": 0,
+          "completed_output": {}
+        }
+      ],
+      "mining_targets": [],
+      "built_in_research_max_tier": 1,
+      "active_research_id": null,
+      "ship_build_queue": []
+    }
+  },
+  "ships": {
+    "ship_builder_1": {
+      "id": "ship_builder_1",
+      "display_name": "Builder-1",
+      "role": "construction",
+      "tier": 1,
+      "position": {
+        "lane_id": "habitable",
+        "radius_units": 1200,
+        "angle_milli": 0
+      },
+      "docked_at": "hub_haven",
+      "base_speed_milli": 3000,
+      "base_mass": 15,
+      "cargo_type": null,
+      "cargo_amount": 0,
+      "max_cargo_capacity": 0,
+      "build_cargo": {},
+      "build_cargo_capacity": 20,
+      "installed_components": {
+        "structuralFrame": 1,
+        "driveAssembly": 1,
+        "constructionBay": 1
+      },
+      "fuel": 100,
+      "fuel_remainder": 0,
+      "fuel_efficiency_remainder": 0,
+      "max_fuel": 100,
+      "build_work_per_tick": 1,
+      "survey_work_per_tick": 0,
+      "max_survey_depth": 0,
+      "state": "idle",
+      "job": { "type": "idle" },
+      "travel_plan": null
+    }
+  },
+  "completed_techs": [
+    "basic_construction",
+    "basic_refining",
+    "basic_power",
+    "basic_control"
+  ]
+}

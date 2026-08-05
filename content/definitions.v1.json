@@ -1,0 +1,1100 @@
+{
+  "content_version": "v1",
+  "defaults": {
+    "new_station_priority": 50,
+    "general_buffer_preferred_maximum": 50,
+    "input_demand_threshold": 100,
+    "output_export_threshold": 0,
+    "fuel_demand_threshold": 20,
+    "fuel_export_threshold": 50,
+    "mining_retune_ticks": 10,
+    "upgrade_work_per_tier": 60,
+    "demolition_work": 30,
+    "survey_depth_work": [300, 600, 900],
+    "hub_shipyard_work_per_tick": 1
+  },
+  "recipes": [
+    {
+      "id": "smelt_metals",
+      "required_tech": "basic_refining",
+      "facilities": [
+        { "station_type": "refinery", "minimum_tier": 1, "cycle_ticks": 10 }
+      ],
+      "inputs": { "metalOre": 2 },
+      "outputs": { "metals": 1 }
+    },
+    {
+      "id": "process_carbon",
+      "required_tech": "basic_refining",
+      "facilities": [
+        { "station_type": "refinery", "minimum_tier": 1, "cycle_ticks": 10 }
+      ],
+      "inputs": { "carbonSoil": 2 },
+      "outputs": { "carbonFiber": 1 }
+    },
+    {
+      "id": "cut_wafers",
+      "required_tech": "basic_refining",
+      "facilities": [
+        { "station_type": "refinery", "minimum_tier": 1, "cycle_ticks": 10 }
+      ],
+      "inputs": { "siliconDust": 2 },
+      "outputs": { "siliconWafers": 1 }
+    },
+    {
+      "id": "make_chemicals",
+      "required_tech": "advanced_refining",
+      "facilities": [
+        { "station_type": "refinery", "minimum_tier": 2, "cycle_ticks": 10 }
+      ],
+      "inputs": { "volcanicSulfur": 1, "waterIce": 1 },
+      "outputs": { "chemicals": 1 }
+    },
+    {
+      "id": "make_fuel",
+      "required_tech": "advanced_refining",
+      "facilities": [
+        { "station_type": "refinery", "minimum_tier": 2, "cycle_ticks": 10 }
+      ],
+      "inputs": { "frozenGases": 2, "chemicals": 1 },
+      "outputs": { "fuel": 2 }
+    },
+    {
+      "id": "smelt_alloys",
+      "required_tech": "alloy_smelting",
+      "facilities": [
+        { "station_type": "refinery", "minimum_tier": 3, "cycle_ticks": 10 }
+      ],
+      "inputs": { "metals": 2, "rareEarthMinerals": 1 },
+      "outputs": { "alloys": 1 }
+    },
+    {
+      "id": "make_optics",
+      "required_tech": "sensor_systems",
+      "facilities": [
+        { "station_type": "refinery", "minimum_tier": 3, "cycle_ticks": 10 }
+      ],
+      "inputs": { "crystalDeposits": 1, "siliconWafers": 1 },
+      "outputs": { "optics": 1 }
+    },
+    {
+      "id": "make_reactor_rods",
+      "required_tech": "fusion_power",
+      "facilities": [
+        { "station_type": "refinery", "minimum_tier": 3, "cycle_ticks": 10 }
+      ],
+      "inputs": { "helium3": 2, "rareEarthMinerals": 1 },
+      "outputs": { "reactorRods": 1 }
+    },
+    {
+      "id": "reclaim_alloys",
+      "required_tech": "alloy_smelting",
+      "facilities": [
+        { "station_type": "refinery", "minimum_tier": 3, "cycle_ticks": 10 }
+      ],
+      "inputs": { "alloys": 1 },
+      "outputs": { "metals": 2, "rareEarthMinerals": 1 }
+    },
+    {
+      "id": "reclaim_optics",
+      "required_tech": "sensor_systems",
+      "facilities": [
+        { "station_type": "refinery", "minimum_tier": 3, "cycle_ticks": 10 }
+      ],
+      "inputs": { "optics": 1 },
+      "outputs": { "crystalDeposits": 1, "siliconWafers": 1 }
+    },
+    {
+      "id": "reclaim_reactor_rods",
+      "required_tech": "fusion_power",
+      "facilities": [
+        { "station_type": "refinery", "minimum_tier": 3, "cycle_ticks": 10 }
+      ],
+      "inputs": { "reactorRods": 1 },
+      "outputs": { "helium3": 2, "rareEarthMinerals": 1 }
+    },
+    {
+      "id": "assemble_frame",
+      "required_tech": "structural_engineering",
+      "facilities": [
+        { "station_type": "hub", "minimum_tier": 1, "cycle_ticks": 30 },
+        { "station_type": "construction", "minimum_tier": 1, "cycle_ticks": 10 }
+      ],
+      "inputs": { "metals": 4, "carbonFiber": 2 },
+      "outputs": { "structuralFrame": 1 }
+    },
+    {
+      "id": "assemble_power_core",
+      "required_tech": "basic_power",
+      "facilities": [
+        { "station_type": "hub", "minimum_tier": 1, "cycle_ticks": 30 },
+        { "station_type": "construction", "minimum_tier": 1, "cycle_ticks": 10 }
+      ],
+      "inputs": { "metals": 4, "siliconWafers": 2 },
+      "outputs": { "powerCore": 1 }
+    },
+    {
+      "id": "assemble_control",
+      "required_tech": "basic_control",
+      "facilities": [
+        { "station_type": "hub", "minimum_tier": 1, "cycle_ticks": 30 },
+        { "station_type": "construction", "minimum_tier": 1, "cycle_ticks": 10 }
+      ],
+      "inputs": { "siliconWafers": 2, "metals": 1 },
+      "outputs": { "controlSystem": 1 }
+    },
+    {
+      "id": "assemble_drive",
+      "required_tech": "factory_automation",
+      "facilities": [
+        { "station_type": "hub", "minimum_tier": 1, "cycle_ticks": 30 },
+        { "station_type": "construction", "minimum_tier": 1, "cycle_ticks": 10 }
+      ],
+      "inputs": { "metals": 3, "fuel": 2, "controlSystem": 1 },
+      "outputs": { "driveAssembly": 1 }
+    },
+    {
+      "id": "assemble_cargo_module",
+      "required_tech": "cargo_handling",
+      "facilities": [
+        { "station_type": "hub", "minimum_tier": 1, "cycle_ticks": 30 },
+        { "station_type": "construction", "minimum_tier": 1, "cycle_ticks": 10 }
+      ],
+      "inputs": { "metals": 3, "carbonFiber": 2, "controlSystem": 1 },
+      "outputs": { "cargoModule": 1 }
+    },
+    {
+      "id": "assemble_research_lab",
+      "required_tech": "sensor_systems",
+      "facilities": [
+        { "station_type": "hub", "minimum_tier": 1, "cycle_ticks": 30 },
+        { "station_type": "construction", "minimum_tier": 1, "cycle_ticks": 10 }
+      ],
+      "inputs": { "siliconWafers": 3, "optics": 1, "powerCore": 1 },
+      "outputs": { "researchLab": 1 }
+    },
+    {
+      "id": "assemble_construction_bay",
+      "required_tech": "factory_automation",
+      "facilities": [
+        { "station_type": "hub", "minimum_tier": 1, "cycle_ticks": 30 },
+        { "station_type": "construction", "minimum_tier": 1, "cycle_ticks": 10 }
+      ],
+      "inputs": { "structuralFrame": 1, "powerCore": 1, "controlSystem": 2 },
+      "outputs": { "constructionBay": 1 }
+    },
+    {
+      "id": "assemble_gate_node",
+      "required_tech": "gate_construction",
+      "facilities": [
+        { "station_type": "construction", "minimum_tier": 4, "cycle_ticks": 10 }
+      ],
+      "inputs": { "alloys": 4, "powerCore": 1, "optics": 2, "reactorRods": 1 },
+      "outputs": { "gateNode": 1 }
+    },
+    {
+      "id": "disassemble_frame",
+      "required_tech": "structural_engineering",
+      "facilities": [
+        { "station_type": "hub", "minimum_tier": 1, "cycle_ticks": 30 },
+        { "station_type": "construction", "minimum_tier": 1, "cycle_ticks": 10 }
+      ],
+      "inputs": { "structuralFrame": 1 },
+      "outputs": { "metals": 4, "carbonFiber": 2 }
+    },
+    {
+      "id": "disassemble_power_core",
+      "required_tech": "basic_power",
+      "facilities": [
+        { "station_type": "hub", "minimum_tier": 1, "cycle_ticks": 30 },
+        { "station_type": "construction", "minimum_tier": 1, "cycle_ticks": 10 }
+      ],
+      "inputs": { "powerCore": 1 },
+      "outputs": { "metals": 4, "siliconWafers": 2 }
+    },
+    {
+      "id": "disassemble_control",
+      "required_tech": "basic_control",
+      "facilities": [
+        { "station_type": "hub", "minimum_tier": 1, "cycle_ticks": 30 },
+        { "station_type": "construction", "minimum_tier": 1, "cycle_ticks": 10 }
+      ],
+      "inputs": { "controlSystem": 1 },
+      "outputs": { "siliconWafers": 2, "metals": 1 }
+    },
+    {
+      "id": "disassemble_drive",
+      "required_tech": "factory_automation",
+      "facilities": [
+        { "station_type": "hub", "minimum_tier": 1, "cycle_ticks": 30 },
+        { "station_type": "construction", "minimum_tier": 1, "cycle_ticks": 10 }
+      ],
+      "inputs": { "driveAssembly": 1 },
+      "outputs": { "metals": 3, "fuel": 2, "controlSystem": 1 }
+    },
+    {
+      "id": "disassemble_cargo_module",
+      "required_tech": "cargo_handling",
+      "facilities": [
+        { "station_type": "hub", "minimum_tier": 1, "cycle_ticks": 30 },
+        { "station_type": "construction", "minimum_tier": 1, "cycle_ticks": 10 }
+      ],
+      "inputs": { "cargoModule": 1 },
+      "outputs": { "metals": 3, "carbonFiber": 2, "controlSystem": 1 }
+    },
+    {
+      "id": "disassemble_research_lab",
+      "required_tech": "sensor_systems",
+      "facilities": [
+        { "station_type": "hub", "minimum_tier": 1, "cycle_ticks": 30 },
+        { "station_type": "construction", "minimum_tier": 1, "cycle_ticks": 10 }
+      ],
+      "inputs": { "researchLab": 1 },
+      "outputs": { "siliconWafers": 3, "optics": 1, "powerCore": 1 }
+    },
+    {
+      "id": "disassemble_construction_bay",
+      "required_tech": "factory_automation",
+      "facilities": [
+        { "station_type": "hub", "minimum_tier": 1, "cycle_ticks": 30 },
+        { "station_type": "construction", "minimum_tier": 1, "cycle_ticks": 10 }
+      ],
+      "inputs": { "constructionBay": 1 },
+      "outputs": { "structuralFrame": 1, "powerCore": 1, "controlSystem": 2 }
+    },
+    {
+      "id": "disassemble_gate_node",
+      "required_tech": "gate_construction",
+      "facilities": [
+        { "station_type": "construction", "minimum_tier": 4, "cycle_ticks": 10 }
+      ],
+      "inputs": { "gateNode": 1 },
+      "outputs": { "alloys": 4, "powerCore": 1, "optics": 2, "reactorRods": 1 }
+    }
+  ],
+  "technologies": [
+    {
+      "id": "basic_construction",
+      "tier": 0,
+      "prerequisites": [],
+      "costs": {},
+      "duration_ticks": 0,
+      "mechanic_unlocks": []
+    },
+    {
+      "id": "basic_refining",
+      "tier": 0,
+      "prerequisites": [],
+      "costs": {},
+      "duration_ticks": 0,
+      "mechanic_unlocks": []
+    },
+    {
+      "id": "basic_power",
+      "tier": 0,
+      "prerequisites": [],
+      "costs": {},
+      "duration_ticks": 0,
+      "mechanic_unlocks": []
+    },
+    {
+      "id": "basic_control",
+      "tier": 0,
+      "prerequisites": [],
+      "costs": {},
+      "duration_ticks": 0,
+      "mechanic_unlocks": []
+    },
+    {
+      "id": "advanced_refining",
+      "tier": 1,
+      "prerequisites": ["basic_refining"],
+      "costs": { "metals": 40, "carbonFiber": 20, "siliconWafers": 20 },
+      "duration_ticks": 600,
+      "mechanic_unlocks": []
+    },
+    {
+      "id": "structural_engineering",
+      "tier": 1,
+      "prerequisites": ["basic_construction"],
+      "costs": { "metals": 30, "carbonFiber": 20 },
+      "duration_ticks": 400,
+      "mechanic_unlocks": []
+    },
+    {
+      "id": "sensor_systems",
+      "tier": 1,
+      "prerequisites": ["basic_control"],
+      "costs": { "metals": 20, "siliconWafers": 30 },
+      "duration_ticks": 500,
+      "mechanic_unlocks": [
+        { "type": "surveyDepth", "max_depth": 1 }
+      ]
+    },
+    {
+      "id": "fusion_power",
+      "tier": 1,
+      "prerequisites": ["basic_power"],
+      "costs": { "metals": 30, "carbonFiber": 20, "helium3": 10 },
+      "duration_ticks": 700,
+      "mechanic_unlocks": []
+    },
+    {
+      "id": "cargo_handling",
+      "tier": 1,
+      "prerequisites": ["basic_construction"],
+      "costs": { "metals": 30, "carbonFiber": 20 },
+      "duration_ticks": 400,
+      "mechanic_unlocks": []
+    },
+    {
+      "id": "alloy_smelting",
+      "tier": 2,
+      "prerequisites": ["advanced_refining"],
+      "costs": { "metals": 40, "rareEarthMinerals": 20, "chemicals": 20 },
+      "duration_ticks": 1200,
+      "mechanic_unlocks": []
+    },
+    {
+      "id": "factory_automation",
+      "tier": 2,
+      "prerequisites": ["structural_engineering", "cargo_handling"],
+      "costs": { "metals": 40, "siliconWafers": 30, "controlSystem": 10 },
+      "duration_ticks": 900,
+      "mechanic_unlocks": []
+    },
+    {
+      "id": "deep_survey",
+      "tier": 2,
+      "prerequisites": ["sensor_systems", "alloy_smelting"],
+      "costs": { "siliconWafers": 30, "metals": 20 },
+      "duration_ticks": 900,
+      "mechanic_unlocks": [
+        { "type": "surveyDepth", "max_depth": 2 }
+      ]
+    },
+    {
+      "id": "reactor_scaling",
+      "tier": 2,
+      "prerequisites": ["fusion_power", "alloy_smelting"],
+      "costs": { "alloys": 30, "reactorRods": 10, "powerCore": 5 },
+      "duration_ticks": 1200,
+      "mechanic_unlocks": []
+    },
+    {
+      "id": "orbital_logistics",
+      "tier": 2,
+      "prerequisites": ["cargo_handling", "deep_survey"],
+      "costs": { "alloys": 30, "optics": 20, "controlSystem": 5 },
+      "duration_ticks": 800,
+      "mechanic_unlocks": [
+        { "type": "asteroidBeltOperations" }
+      ]
+    },
+    {
+      "id": "life_support",
+      "tier": 2,
+      "prerequisites": ["advanced_refining"],
+      "costs": { "chemicals": 30, "fuel": 20, "siliconWafers": 10 },
+      "duration_ticks": 900,
+      "mechanic_unlocks": [
+        { "type": "lifeSupportFuelFactor", "numerator": 4, "denominator": 5 }
+      ]
+    },
+    {
+      "id": "precision_manufacturing",
+      "tier": 3,
+      "prerequisites": ["factory_automation", "alloy_smelting"],
+      "costs": { "alloys": 60, "siliconWafers": 30, "optics": 20, "powerCore": 10 },
+      "duration_ticks": 2400,
+      "mechanic_unlocks": []
+    },
+    {
+      "id": "heavy_transport",
+      "tier": 3,
+      "prerequisites": ["orbital_logistics", "life_support", "factory_automation"],
+      "costs": { "alloys": 50, "cargoModule": 20, "driveAssembly": 10 },
+      "duration_ticks": 1800,
+      "mechanic_unlocks": []
+    },
+    {
+      "id": "exploration_suite",
+      "tier": 3,
+      "prerequisites": ["deep_survey", "reactor_scaling"],
+      "costs": { "siliconWafers": 40, "optics": 30, "powerCore": 10 },
+      "duration_ticks": 1800,
+      "mechanic_unlocks": [
+        { "type": "surveyDepth", "max_depth": 3 }
+      ]
+    },
+    {
+      "id": "grid_power",
+      "tier": 3,
+      "prerequisites": ["reactor_scaling"],
+      "costs": { "alloys": 50, "reactorRods": 30, "controlSystem": 10 },
+      "duration_ticks": 2400,
+      "mechanic_unlocks": []
+    },
+    {
+      "id": "gate_theory",
+      "tier": 3,
+      "prerequisites": ["precision_manufacturing", "exploration_suite"],
+      "costs": { "alloys": 60, "optics": 40, "reactorRods": 20 },
+      "duration_ticks": 2400,
+      "mechanic_unlocks": [
+        { "type": "gateSiteVisibility" }
+      ]
+    },
+    {
+      "id": "advanced_fabrication",
+      "tier": 4,
+      "prerequisites": ["precision_manufacturing", "heavy_transport"],
+      "costs": { "alloys": 80, "optics": 40, "controlSystem": 20, "powerCore": 10 },
+      "duration_ticks": 3600,
+      "mechanic_unlocks": []
+    },
+    {
+      "id": "gate_construction",
+      "tier": 4,
+      "prerequisites": ["gate_theory", "advanced_fabrication", "grid_power"],
+      "costs": { "alloys": 100, "reactorRods": 60, "powerCore": 20 },
+      "duration_ticks": 4800,
+      "mechanic_unlocks": []
+    },
+    {
+      "id": "system_bridge",
+      "tier": 4,
+      "prerequisites": ["gate_construction"],
+      "costs": { "alloys": 50, "reactorRods": 30, "powerCore": 10 },
+      "duration_ticks": 1200,
+      "mechanic_unlocks": [
+        { "type": "gateAssembly" }
+      ]
+    }
+  ],
+  "ships": [
+    {
+      "role": "cargo",
+      "tier": 1,
+      "name": "Courier",
+      "stats": {
+        "cargo_capacity": 50,
+        "build_cargo_capacity": 0,
+        "speed_milli": 3000,
+        "max_fuel": 100,
+        "base_mass": 10,
+        "build_work_per_tick": 0,
+        "survey_work_per_tick": 0,
+        "max_survey_depth": 0
+      },
+      "build_work": 30,
+      "component_cost": { "structuralFrame": 1, "driveAssembly": 1, "cargoModule": 1 },
+      "required_tech": "basic_construction"
+    },
+    {
+      "role": "cargo",
+      "tier": 2,
+      "name": "Hauler",
+      "stats": {
+        "cargo_capacity": 120,
+        "build_cargo_capacity": 0,
+        "speed_milli": 3500,
+        "max_fuel": 200,
+        "base_mass": 18,
+        "build_work_per_tick": 0,
+        "survey_work_per_tick": 0,
+        "max_survey_depth": 0
+      },
+      "build_work": 60,
+      "component_cost": { "structuralFrame": 1, "driveAssembly": 1, "cargoModule": 2 },
+      "required_tech": "structural_engineering"
+    },
+    {
+      "role": "cargo",
+      "tier": 3,
+      "name": "Bulk Carrier",
+      "stats": {
+        "cargo_capacity": 300,
+        "build_cargo_capacity": 0,
+        "speed_milli": 3000,
+        "max_fuel": 400,
+        "base_mass": 30,
+        "build_work_per_tick": 0,
+        "survey_work_per_tick": 0,
+        "max_survey_depth": 0
+      },
+      "build_work": 120,
+      "component_cost": { "structuralFrame": 2, "driveAssembly": 2, "cargoModule": 3 },
+      "required_tech": "heavy_transport"
+    },
+    {
+      "role": "cargo",
+      "tier": 4,
+      "name": "Fast Freighter",
+      "stats": {
+        "cargo_capacity": 100,
+        "build_cargo_capacity": 0,
+        "speed_milli": 6000,
+        "max_fuel": 800,
+        "base_mass": 20,
+        "build_work_per_tick": 0,
+        "survey_work_per_tick": 0,
+        "max_survey_depth": 0
+      },
+      "build_work": 240,
+      "component_cost": { "structuralFrame": 1, "driveAssembly": 2, "cargoModule": 1 },
+      "required_tech": "advanced_fabrication"
+    },
+    {
+      "role": "construction",
+      "tier": 1,
+      "name": "Builder",
+      "stats": {
+        "cargo_capacity": 0,
+        "build_cargo_capacity": 20,
+        "speed_milli": 3000,
+        "max_fuel": 100,
+        "base_mass": 15,
+        "build_work_per_tick": 1,
+        "survey_work_per_tick": 0,
+        "max_survey_depth": 0
+      },
+      "build_work": 30,
+      "component_cost": { "structuralFrame": 1, "driveAssembly": 1, "constructionBay": 1 },
+      "required_tech": "basic_construction"
+    },
+    {
+      "role": "construction",
+      "tier": 2,
+      "name": "Constructor",
+      "stats": {
+        "cargo_capacity": 0,
+        "build_cargo_capacity": 40,
+        "speed_milli": 3500,
+        "max_fuel": 200,
+        "base_mass": 25,
+        "build_work_per_tick": 2,
+        "survey_work_per_tick": 0,
+        "max_survey_depth": 0
+      },
+      "build_work": 60,
+      "component_cost": { "structuralFrame": 1, "driveAssembly": 1, "constructionBay": 1 },
+      "required_tech": "structural_engineering"
+    },
+    {
+      "role": "construction",
+      "tier": 3,
+      "name": "Engineer",
+      "stats": {
+        "cargo_capacity": 0,
+        "build_cargo_capacity": 80,
+        "speed_milli": 4000,
+        "max_fuel": 400,
+        "base_mass": 40,
+        "build_work_per_tick": 3,
+        "survey_work_per_tick": 0,
+        "max_survey_depth": 0
+      },
+      "build_work": 120,
+      "component_cost": { "structuralFrame": 2, "driveAssembly": 2, "constructionBay": 2 },
+      "required_tech": "precision_manufacturing"
+    },
+    {
+      "role": "construction",
+      "tier": 4,
+      "name": "Fabricator",
+      "stats": {
+        "cargo_capacity": 0,
+        "build_cargo_capacity": 160,
+        "speed_milli": 5000,
+        "max_fuel": 800,
+        "base_mass": 50,
+        "build_work_per_tick": 5,
+        "survey_work_per_tick": 0,
+        "max_survey_depth": 0
+      },
+      "build_work": 240,
+      "component_cost": { "structuralFrame": 2, "driveAssembly": 2, "constructionBay": 2 },
+      "required_tech": "advanced_fabrication"
+    },
+    {
+      "role": "research",
+      "tier": 1,
+      "name": "Scout",
+      "stats": {
+        "cargo_capacity": 0,
+        "build_cargo_capacity": 0,
+        "speed_milli": 3500,
+        "max_fuel": 100,
+        "base_mass": 8,
+        "build_work_per_tick": 0,
+        "survey_work_per_tick": 1,
+        "max_survey_depth": 1
+      },
+      "build_work": 30,
+      "component_cost": { "structuralFrame": 1, "driveAssembly": 1, "researchLab": 1 },
+      "required_tech": "sensor_systems"
+    },
+    {
+      "role": "research",
+      "tier": 2,
+      "name": "Surveyor",
+      "stats": {
+        "cargo_capacity": 0,
+        "build_cargo_capacity": 0,
+        "speed_milli": 4000,
+        "max_fuel": 200,
+        "base_mass": 12,
+        "build_work_per_tick": 0,
+        "survey_work_per_tick": 2,
+        "max_survey_depth": 2
+      },
+      "build_work": 60,
+      "component_cost": { "structuralFrame": 1, "driveAssembly": 1, "researchLab": 1 },
+      "required_tech": "deep_survey"
+    },
+    {
+      "role": "research",
+      "tier": 3,
+      "name": "Explorer",
+      "stats": {
+        "cargo_capacity": 0,
+        "build_cargo_capacity": 0,
+        "speed_milli": 4500,
+        "max_fuel": 400,
+        "base_mass": 18,
+        "build_work_per_tick": 0,
+        "survey_work_per_tick": 3,
+        "max_survey_depth": 3
+      },
+      "build_work": 120,
+      "component_cost": { "structuralFrame": 2, "driveAssembly": 2, "researchLab": 1 },
+      "required_tech": "exploration_suite"
+    },
+    {
+      "role": "research",
+      "tier": 4,
+      "name": "Pioneer",
+      "stats": {
+        "cargo_capacity": 0,
+        "build_cargo_capacity": 0,
+        "speed_milli": 5500,
+        "max_fuel": 800,
+        "base_mass": 24,
+        "build_work_per_tick": 0,
+        "survey_work_per_tick": 5,
+        "max_survey_depth": 3
+      },
+      "build_work": 240,
+      "component_cost": { "structuralFrame": 2, "driveAssembly": 2, "researchLab": 2 },
+      "required_tech": "advanced_fabrication"
+    }
+  ],
+  "stations": [
+    {
+      "station_type": "hub",
+      "tier": 1,
+      "stats": {
+        "docks": 2,
+        "cargo_capacity": 200,
+        "fuel_capacity": 200,
+        "production_slots": 0,
+        "max_targets": 0,
+        "extraction_per_target_per_10_ticks": 0,
+        "research_projects": 0,
+        "shipyard_slots": 1,
+        "component_slots": 1
+      },
+      "build_work": 60,
+      "component_cost": { "structuralFrame": 1, "powerCore": 1, "controlSystem": 1, "cargoModule": 1 },
+      "required_tech": "basic_construction"
+    },
+    {
+      "station_type": "hub",
+      "tier": 2,
+      "stats": {
+        "docks": 4,
+        "cargo_capacity": 500,
+        "fuel_capacity": 500,
+        "production_slots": 0,
+        "max_targets": 0,
+        "extraction_per_target_per_10_ticks": 0,
+        "research_projects": 0,
+        "shipyard_slots": 1,
+        "component_slots": 1
+      },
+      "build_work": 120,
+      "component_cost": { "structuralFrame": 2, "powerCore": 2, "controlSystem": 2, "cargoModule": 2 },
+      "required_tech": "fusion_power"
+    },
+    {
+      "station_type": "hub",
+      "tier": 3,
+      "stats": {
+        "docks": 6,
+        "cargo_capacity": 1000,
+        "fuel_capacity": 1000,
+        "production_slots": 0,
+        "max_targets": 0,
+        "extraction_per_target_per_10_ticks": 0,
+        "research_projects": 0,
+        "shipyard_slots": 1,
+        "component_slots": 1
+      },
+      "build_work": 240,
+      "component_cost": { "structuralFrame": 3, "powerCore": 3, "controlSystem": 3, "cargoModule": 4 },
+      "required_tech": "heavy_transport"
+    },
+    {
+      "station_type": "hub",
+      "tier": 4,
+      "stats": {
+        "docks": 8,
+        "cargo_capacity": 2000,
+        "fuel_capacity": 2000,
+        "production_slots": 0,
+        "max_targets": 0,
+        "extraction_per_target_per_10_ticks": 0,
+        "research_projects": 0,
+        "shipyard_slots": 1,
+        "component_slots": 1
+      },
+      "build_work": 480,
+      "component_cost": { "structuralFrame": 4, "powerCore": 4, "controlSystem": 4, "cargoModule": 6 },
+      "required_tech": "advanced_fabrication"
+    },
+    {
+      "station_type": "mining",
+      "tier": 1,
+      "stats": {
+        "docks": 1,
+        "cargo_capacity": 100,
+        "fuel_capacity": 100,
+        "production_slots": 0,
+        "max_targets": 1,
+        "extraction_per_target_per_10_ticks": 1,
+        "research_projects": 0,
+        "shipyard_slots": 0,
+        "component_slots": 0
+      },
+      "build_work": 60,
+      "component_cost": { "structuralFrame": 1, "powerCore": 1, "cargoModule": 1 },
+      "required_tech": "basic_construction"
+    },
+    {
+      "station_type": "mining",
+      "tier": 2,
+      "stats": {
+        "docks": 2,
+        "cargo_capacity": 200,
+        "fuel_capacity": 200,
+        "production_slots": 0,
+        "max_targets": 2,
+        "extraction_per_target_per_10_ticks": 2,
+        "research_projects": 0,
+        "shipyard_slots": 0,
+        "component_slots": 0
+      },
+      "build_work": 120,
+      "component_cost": { "structuralFrame": 2, "powerCore": 2, "cargoModule": 2 },
+      "required_tech": "orbital_logistics"
+    },
+    {
+      "station_type": "mining",
+      "tier": 3,
+      "stats": {
+        "docks": 3,
+        "cargo_capacity": 400,
+        "fuel_capacity": 400,
+        "production_slots": 0,
+        "max_targets": 3,
+        "extraction_per_target_per_10_ticks": 3,
+        "research_projects": 0,
+        "shipyard_slots": 0,
+        "component_slots": 0
+      },
+      "build_work": 240,
+      "component_cost": { "structuralFrame": 3, "powerCore": 3, "cargoModule": 3 },
+      "required_tech": "precision_manufacturing"
+    },
+    {
+      "station_type": "mining",
+      "tier": 4,
+      "stats": {
+        "docks": 4,
+        "cargo_capacity": 800,
+        "fuel_capacity": 800,
+        "production_slots": 0,
+        "max_targets": 4,
+        "extraction_per_target_per_10_ticks": 5,
+        "research_projects": 0,
+        "shipyard_slots": 0,
+        "component_slots": 0
+      },
+      "build_work": 480,
+      "component_cost": { "structuralFrame": 4, "powerCore": 4, "cargoModule": 4 },
+      "required_tech": "advanced_fabrication"
+    },
+    {
+      "station_type": "refinery",
+      "tier": 1,
+      "stats": {
+        "docks": 1,
+        "cargo_capacity": 200,
+        "fuel_capacity": 100,
+        "production_slots": 1,
+        "max_targets": 0,
+        "extraction_per_target_per_10_ticks": 0,
+        "research_projects": 0,
+        "shipyard_slots": 0,
+        "component_slots": 0
+      },
+      "build_work": 60,
+      "component_cost": { "structuralFrame": 1, "powerCore": 1, "controlSystem": 1 },
+      "required_tech": "basic_refining"
+    },
+    {
+      "station_type": "refinery",
+      "tier": 2,
+      "stats": {
+        "docks": 2,
+        "cargo_capacity": 400,
+        "fuel_capacity": 200,
+        "production_slots": 2,
+        "max_targets": 0,
+        "extraction_per_target_per_10_ticks": 0,
+        "research_projects": 0,
+        "shipyard_slots": 0,
+        "component_slots": 0
+      },
+      "build_work": 120,
+      "component_cost": { "structuralFrame": 2, "powerCore": 2, "controlSystem": 2 },
+      "required_tech": "advanced_refining"
+    },
+    {
+      "station_type": "refinery",
+      "tier": 3,
+      "stats": {
+        "docks": 3,
+        "cargo_capacity": 800,
+        "fuel_capacity": 400,
+        "production_slots": 3,
+        "max_targets": 0,
+        "extraction_per_target_per_10_ticks": 0,
+        "research_projects": 0,
+        "shipyard_slots": 0,
+        "component_slots": 0
+      },
+      "build_work": 240,
+      "component_cost": { "structuralFrame": 3, "powerCore": 3, "controlSystem": 3 },
+      "required_tech": "alloy_smelting"
+    },
+    {
+      "station_type": "refinery",
+      "tier": 4,
+      "stats": {
+        "docks": 4,
+        "cargo_capacity": 1600,
+        "fuel_capacity": 800,
+        "production_slots": 4,
+        "max_targets": 0,
+        "extraction_per_target_per_10_ticks": 0,
+        "research_projects": 0,
+        "shipyard_slots": 0,
+        "component_slots": 0
+      },
+      "build_work": 480,
+      "component_cost": { "structuralFrame": 4, "powerCore": 4, "controlSystem": 4 },
+      "required_tech": "advanced_fabrication"
+    },
+    {
+      "station_type": "construction",
+      "tier": 1,
+      "stats": {
+        "docks": 1,
+        "cargo_capacity": 200,
+        "fuel_capacity": 100,
+        "production_slots": 1,
+        "max_targets": 0,
+        "extraction_per_target_per_10_ticks": 0,
+        "research_projects": 0,
+        "shipyard_slots": 0,
+        "component_slots": 0
+      },
+      "build_work": 60,
+      "component_cost": { "structuralFrame": 1, "powerCore": 1, "constructionBay": 1 },
+      "required_tech": "factory_automation"
+    },
+    {
+      "station_type": "construction",
+      "tier": 2,
+      "stats": {
+        "docks": 2,
+        "cargo_capacity": 400,
+        "fuel_capacity": 200,
+        "production_slots": 2,
+        "max_targets": 0,
+        "extraction_per_target_per_10_ticks": 0,
+        "research_projects": 0,
+        "shipyard_slots": 0,
+        "component_slots": 0
+      },
+      "build_work": 120,
+      "component_cost": { "structuralFrame": 2, "powerCore": 2, "constructionBay": 2 },
+      "required_tech": "reactor_scaling"
+    },
+    {
+      "station_type": "construction",
+      "tier": 3,
+      "stats": {
+        "docks": 3,
+        "cargo_capacity": 800,
+        "fuel_capacity": 400,
+        "production_slots": 3,
+        "max_targets": 0,
+        "extraction_per_target_per_10_ticks": 0,
+        "research_projects": 0,
+        "shipyard_slots": 0,
+        "component_slots": 0
+      },
+      "build_work": 240,
+      "component_cost": { "structuralFrame": 3, "powerCore": 3, "constructionBay": 3 },
+      "required_tech": "precision_manufacturing"
+    },
+    {
+      "station_type": "construction",
+      "tier": 4,
+      "stats": {
+        "docks": 4,
+        "cargo_capacity": 1600,
+        "fuel_capacity": 800,
+        "production_slots": 4,
+        "max_targets": 0,
+        "extraction_per_target_per_10_ticks": 0,
+        "research_projects": 0,
+        "shipyard_slots": 0,
+        "component_slots": 0
+      },
+      "build_work": 480,
+      "component_cost": { "structuralFrame": 4, "powerCore": 4, "constructionBay": 4 },
+      "required_tech": "advanced_fabrication"
+    },
+    {
+      "station_type": "research",
+      "tier": 1,
+      "stats": {
+        "docks": 1,
+        "cargo_capacity": 200,
+        "fuel_capacity": 100,
+        "production_slots": 0,
+        "max_targets": 0,
+        "extraction_per_target_per_10_ticks": 0,
+        "research_projects": 1,
+        "shipyard_slots": 0,
+        "component_slots": 0
+      },
+      "build_work": 60,
+      "component_cost": { "structuralFrame": 1, "powerCore": 1, "researchLab": 1 },
+      "required_tech": "sensor_systems"
+    },
+    {
+      "station_type": "research",
+      "tier": 2,
+      "stats": {
+        "docks": 2,
+        "cargo_capacity": 400,
+        "fuel_capacity": 200,
+        "production_slots": 0,
+        "max_targets": 0,
+        "extraction_per_target_per_10_ticks": 0,
+        "research_projects": 1,
+        "shipyard_slots": 0,
+        "component_slots": 0
+      },
+      "build_work": 120,
+      "component_cost": { "structuralFrame": 2, "powerCore": 2, "researchLab": 2 },
+      "required_tech": "deep_survey"
+    },
+    {
+      "station_type": "research",
+      "tier": 3,
+      "stats": {
+        "docks": 3,
+        "cargo_capacity": 800,
+        "fuel_capacity": 400,
+        "production_slots": 0,
+        "max_targets": 0,
+        "extraction_per_target_per_10_ticks": 0,
+        "research_projects": 1,
+        "shipyard_slots": 0,
+        "component_slots": 0
+      },
+      "build_work": 240,
+      "component_cost": { "structuralFrame": 3, "powerCore": 3, "researchLab": 3 },
+      "required_tech": "exploration_suite"
+    },
+    {
+      "station_type": "research",
+      "tier": 4,
+      "stats": {
+        "docks": 4,
+        "cargo_capacity": 1600,
+        "fuel_capacity": 800,
+        "production_slots": 0,
+        "max_targets": 0,
+        "extraction_per_target_per_10_ticks": 0,
+        "research_projects": 1,
+        "shipyard_slots": 0,
+        "component_slots": 0
+      },
+      "build_work": 480,
+      "component_cost": { "structuralFrame": 4, "powerCore": 4, "researchLab": 4 },
+      "required_tech": "advanced_fabrication"
+    }
+  ],
+  "gate": {
+    "site_position": {
+      "lane_id": "fringe",
+      "radius_units": 4000,
+      "angle_milli": 0
+    },
+    "manifest": {
+      "gateNode": 8,
+      "structuralFrame": 1,
+      "powerCore": 1,
+      "controlSystem": 1,
+      "reactorRods": 1
+    },
+    "required_techs": ["system_bridge"],
+    "required_fabricator_role": "construction",
+    "minimum_fabricator_tier": 4,
+    "logistics_priority": 100,
+    "transfer_berths": 1,
+    "phases": [
+      {
+        "phase": "sitePreparation",
+        "work": 300,
+        "required_deliveries": {},
+        "completion_consumption": {}
+      },
+      {
+        "phase": "frameAssembly",
+        "work": 600,
+        "required_deliveries": { "gateNode": 8, "structuralFrame": 1 },
+        "completion_consumption": {}
+      },
+      {
+        "phase": "powerIntegration",
+        "work": 300,
+        "required_deliveries": { "powerCore": 1, "controlSystem": 1 },
+        "completion_consumption": {}
+      },
+      {
+        "phase": "activation",
+        "work": 120,
+        "required_deliveries": { "reactorRods": 1 },
+        "completion_consumption": { "reactorRods": 1 }
+      }
+    ]
+  }
+}
