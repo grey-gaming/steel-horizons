@@ -648,7 +648,7 @@ Notes: Independent review completed. Dead code removed from `validate_gate_defin
 ```text
 Increment: P1-05
 Date: 2026-08-05
-Commit: (pending — commit after review)
+Commit: 5b51213
 Requirements: GDD 13 §Content Definitions (normalized representation); GDD 14 §Authored Content & Balance Catalog, §Solvability Budget; ADR-0006 §Canonical JSON v1 byte encoding, §Collection ordering, §Domain separation prefixes, §Canonical content hash input; ADR-0005 §Content Validation Gate
 Focused proof: `cargo test --lib` — 155 tests covering canonical JSON writer (13 tests), content hash computation (4 tests), existing content/state/type/command tests (128 tests), and 6 new P1-05 semantic fixture tests (tech DAG cycle, unknown required tech, inverse recipe mismatch, zero-quantity component cost, build hold exceeds cargo, critical resource budget). Canonical content validates with zero errors.
 Cumulative gates: `cargo clippy` (clean), `cargo build` (clean), `cargo test --lib` (155/155 pass)
