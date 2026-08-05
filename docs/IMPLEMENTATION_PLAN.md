@@ -469,17 +469,18 @@ Notes: <remaining non-blocking follow-up, if any>
 
 Gate 0 was independently re-audited on 2026-08-04 after its initial closure.
 The entries below retain each original closure commit for traceability; all
-corrections named in the notes belong to the enclosing Gate 0 audit change. No
-production harness exists before P1-01, so Gate 0 uses document proofs and names
-the exact future executable owners. The common audit runs `git diff --check`, a
-read-only local Markdown link/anchor/frontmatter/fence check, a byte comparison
-of the duplicated per-turn protocol, ADR-index coverage, and targeted stale-rule
-searches. All passed before this log was finalized.
+corrections named in the notes belong to the enclosing Gate 0 audit change
+(b4fb5e1). No production harness exists before P1-01, so Gate 0 uses document
+proofs and names the exact future executable owners. The common audit runs
+`git diff --check`, a read-only local Markdown link/anchor/frontmatter/fence
+check, a byte comparison of the duplicated per-turn protocol, ADR-index
+coverage, and targeted stale-rule searches. All passed before this log was
+finalized.
 
 ```text
 Increment: G0-01
 Date: 2026-08-04
-Commit: 317e05a (original closure; evidence follow-up f1f3872)
+Commit: 317e05a (original closure; evidence follow-up f1f3872; audit repair b4fb5e1)
 Requirements: GDD 13 §Content Definitions and §Schema Generation Ownership; GDD 14 §Starting State, §Canonical Ship Definitions, §Canonical Station Definitions, §Space Gate Definition, and §Automatic Buffer Defaults
 Focused proof: Content-contract cross-check. Future executable proof: P1-02b round-trips the complete strict DTO roots and schema exporter; P1-03 regeneration is diff-free and exact fixtures cover every authored value; P1-04/P1-05 validate both roots.
 Cumulative gates: Common Gate 0 document audit — passed.
@@ -491,7 +492,7 @@ Notes: Audit repair closes the malformed code fence, distinguishes authored data
 ```text
 Increment: G0-02
 Date: 2026-08-04
-Commit: e199942 (original closure)
+Commit: e199942 (original closure; audit repair b4fb5e1)
 Requirements: ADR-0006 §§1–9; GDD 12 §Save, Load, and Replay; GDD 13 §Lifecycle, RNG, Commands, and Root State and §Content Definitions
 Focused proof: Hash-contract cross-check. Future executable proof: P1-05 locks normalized content bytes/hash; P1-08 locks scenario/replay-equivalence/save-integrity projections; P1-13 verifies save integrity; P1-36 compares canonical bytes and hashes on supported runners.
 Cumulative gates: Common Gate 0 document audit — passed.
@@ -503,7 +504,7 @@ Notes: Audit repair replaces nonexistent library “canonical modes” with proj
 ```text
 Increment: G0-03
 Date: 2026-08-04
-Commit: 53902e7 (original closure; evidence follow-up be0999d)
+Commit: 53902e7 (original closure; evidence follow-up be0999d; audit repair b4fb5e1)
 Requirements: ADR-0007 §§1–7; ADR-0004 §Save Normalization; ADR-0006 §§5–7; GDD 12 §Save, Load, and Replay; GDD 13 §Lifecycle, RNG, Commands, and Root State
 Focused proof: Envelope/load-order cross-check. Future executable proof: P1-13 covers canonical save round-trip, exact content compatibility, raw-hash-before-migration validation, every contiguous migration fixture, injected atomic-write failure, and replay equivalence.
 Cumulative gates: Common Gate 0 document audit — passed.
@@ -515,7 +516,7 @@ Notes: Audit repair gives the envelope explicit hash_scheme, schema_version, con
 ```text
 Increment: G0-04
 Date: 2026-08-04
-Commit: 04bb9cf (original closure)
+Commit: 04bb9cf (original closure; audit repair b4fb5e1)
 Requirements: ADR-0008 §§1–7; ADR-0003 §Command Envelope and Ordering and §Idempotency; ADR-0007 §§3–4; GDD 13 §Lifecycle, RNG, Commands, and Root State
 Focused proof: Command/control/save-barrier cross-check. Future executable proof: P1-12 tests full-envelope idempotency and state-replacement receipt merging; P1-13 tests pending replayable commands, FIFO SaveNow inclusion/exclusion, failed writes, load validation, restart import, and replay equivalence.
 Cumulative gates: Common Gate 0 document audit — passed.
@@ -527,7 +528,7 @@ Notes: Audit repair separates replayable commands from actor controls, makes Ses
 ```text
 Increment: G0-05
 Date: 2026-08-04
-Commit: d4f88b0 (original closure)
+Commit: d4f88b0 (original closure; audit repair b4fb5e1)
 Requirements: ADR-0009 §§1–7; GDD 5 §Station Hub, §Build Work, and §Cancellation; GDD 13 §Station and §Construction and Salvage
 Focused proof: Shipyard queue/conservation cross-check. Future executable proof: P1-15 covers one active plus FIFO pending orders, promotion, staging/delivery, active/pending cancellation including loaded inbound cargo, exact component conservation, zero-Fuel ship completion, and save/replay.
 Cumulative gates: Common Gate 0 document audit — passed.
@@ -539,7 +540,7 @@ Notes: Audit repair makes only queue index zero active and demand-producing, def
 ```text
 Increment: G0-06
 Date: 2026-08-04
-Commit: d915d15 (original closure)
+Commit: d915d15 (original closure; audit repair b4fb5e1)
 Requirements: ADR-0010 §§1–7; GDD 12 §Mining drift, retune, and extraction reducers; GDD 13 §Buffers and Production; GDD 14 §The Veil
 Focused proof: Mining reducer/boundary cross-check. Future executable proof: P1-17 covers slot identity, repeated retunes, partial/full capacity, exact/excess exhaustion, shared-deposit contention and conservation; P1-26 covers tick-999→1,000 drift, save/load, replay, and PRNG equality.
 Cumulative gates: Common Gate 0 document audit — passed.
@@ -551,7 +552,7 @@ Notes: Audit repair adds serialized slot_index and exact ten-resulting-tick retu
 ```text
 Increment: G0-07
 Date: 2026-08-04
-Commit: 0d2a2a9 (original closure)
+Commit: 0d2a2a9 (original closure; audit repair b4fb5e1)
 Requirements: ADR-0011 §§1–8; GDD 3 §Fuel; GDD 7 §Fuel Safety and §Deterministic Cargo Matching; GDD 12 §Movement, Fuel, Life Support, and Refueling
 Focused proof: Refuel feasibility/arrival-order cross-check. Future executable proof: P1-20 proves exact cloned-remainder Fuel/Life Support feasibility and final-leg debit; P1-21 proves reservation contention, full/partial/zero direct transfers, all-role assignment, export-floor independence, and Hub rescue boundaries.
 Cumulative gates: Common Gate 0 document audit — passed.
@@ -563,7 +564,7 @@ Notes: Audit repair accepts the ADR, distinguishes direct unreserved Fuel from C
 ```text
 Increment: G0-08
 Date: 2026-08-04
-Commit: ed287f5 (original closure)
+Commit: ed287f5 (original closure; audit repair b4fb5e1)
 Requirements: ADR-0012 §§1–8; ADR-0003 §V1 Commands and §Events and Resynchronization; GDD 13 §Lifecycle, RNG, Commands, and Root State and §Research; TDD 02 §Events
 Focused proof: Exhaustive wire-union/cache/research cross-check. Future executable proof: P1-22 covers pause/resume/reassignment material location and NoResearchShip; P1-31 covers every retained event, full root/entity replacement, deletion, retention, polling, and resync; P1-32 repeats the shared corpus under WebSocket backpressure.
 Cumulative gates: Common Gate 0 document audit — passed.
@@ -575,7 +576,7 @@ Notes: Audit repair defines an exhaustive retained-event union including Command
 ```text
 Increment: G0-09
 Date: 2026-08-04
-Commit: 3455791 (original closure)
+Commit: 3455791 (original closure; audit repair b4fb5e1)
 Requirements: ADR-0005 §CI Policy — Greenfield Construction; TDD 04 §Quality Gates; this plan §Gate activation matrix and §Phase 1 completion gate; AGENTS.md §Verification order; TDD 05 §CI Staging and Matrix
 Focused proof: Staged-gate policy comparison. Future executable proof: P1-01 adds marker-based protocol equality and a staged policy manifest/check; each later owning increment activates only its named cumulative or qualification gate.
 Cumulative gates: Common Gate 0 document audit — passed; the per-turn protocol block is byte-identical between AGENTS.md and this plan.
