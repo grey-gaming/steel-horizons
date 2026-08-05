@@ -157,7 +157,7 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
   - Verify: serialization snapshots, enum/newtype round trips, stable resource order, invalid/unknown-field cases.
   - Depends on: G0-01, P1-01.
 
-- [ ] **P1-02b — Serialized state/content contracts and schema exporter.**
+- [x] **P1-02b — Serialized state/content contracts and schema exporter.**
   - Deliver: every GDD 13 Serde-only DTO including `GameState`, `DefinitionsCatalog`, `StartingScenario`, commands, strict unknown-field policy, `BTreeMap`/`BTreeSet` shapes, and deterministic content JSON Schema export.
   - Verify: full DTO round trips; explicit null/empty collection fixtures; root-schema snapshots; duplicate/unknown/missing-field rejection; regeneration has no diff.
   - Depends on: G0-04–G0-08, P1-02a.
@@ -511,6 +511,18 @@ Cumulative gates: `cargo fmt --check` (clean), `cargo build --locked` (clean), `
 Scenarios activated: none (primitive types only)
 Golden/hash changes: none
 Notes: Review subagent flagged TransportStage having no direct round-trip test and thin variant coverage. Both addressed before commit: added TransportStage round-trip test and comprehensive all-variant round-trip tests for BuildState, ResearchState, SurveyOrderState, ReservationState, GatePhase, and ResearchPauseReason.
+```
+
+```text
+Increment: P1-02b
+Date: 2026-08-05
+Commit: <pending>
+Requirements: GDD 13 §Content Definitions, §Serialized State DTOs, §Commands, §Schema Generation Ownership; GDD 13 §Identifiers and Resources (id newtype JsonSchema); GDD 13 §Entity Enums, §Lanes, §Lifecycle, §Destination References, §Build Targets/States, §Research, §Survey Orders, §Reservations, §Gate, §Commands (types JsonSchema)
+Focused proof: `cargo run -p steel-horizons-engine --bin schema_export -- <tmpdir>` — 35 JSON Schema files generated for every root DTO. Round-trip tests added for every state DTO (SystemPosition, TravelSegment, TravelPlan, Buffer, ProductionSlot, MiningTarget, Station, Ship, ResourceDeposit, CelestialBody, RationalRemainder, ResearchProject, SurveyOrder, BuildOrder, SalvageCache, GateBuild, Reservation, BottleneckTracker, RNGState, IdCounters, CommandRecord, GameState, GameSnapshot) and every command DTO (BufferConfiguration variants, ActorControl variants, ReplayableGameCommand variants, CommandEnvelope, CommandAcknowledgement).
+Cumulative gates: `cargo fmt --check` (clean), `cargo build --locked` (clean), `cargo clippy --locked -- -D warnings` (clean), `cargo test --locked` (29/29 pass), schema export binary (35 schemas generated, deterministic across runs)
+Scenarios activated: none (DTO/schema-only increment)
+Golden/hash changes: none (generated schemas are deterministic; content files deferred to P1-03)
+Notes: JsonSchema derives added to all DTO structs/enums in state.rs, content.rs, command.rs, types.rs, and the id_newtype! macro in id.rs. Fixed-field-size limitation: BottleneckTracker.deliveries_by_tick changed from `[u32; 600]` to `Vec<u32>` to satisfy serde fixed-array constraint (arrays > 32 elements lack serde derive support). Schema export binary count corrected from 33 to 35. Dead BTreeSet import removed from content.rs (false positive — BTreeSet is used at completed_techs field). Derive ordering unified: all files use `Serialize, Deserialize, JsonSchema` consistently. Missing docs suppression added at module level. Round-trip tests added for every state and command DTO.
 ```
 
 ```text

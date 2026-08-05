@@ -7,12 +7,13 @@
 //! Generated IDs use the reserved prefixes defined in GDD 13 §Identifiers and
 //! Resources; authored IDs must avoid those prefixes (validated in P1-04).
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 macro_rules! id_newtype {
     ($(#[$meta:meta])* $name:ident) => {
         $(#[$meta])*
-        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema)]
         #[serde(transparent)]
         pub struct $name(pub String);
 

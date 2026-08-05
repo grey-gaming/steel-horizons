@@ -23,6 +23,7 @@
 //! resource/lane order from GDD 14 §Canonical Refining Recipes and GDD 13's
 //! lane definitions.  This ensures `BTreeMap`/`BTreeSet` iteration is stable.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 // ─── Resource type ────────────────────────────────────────────────────
@@ -32,7 +33,7 @@ use serde::{Deserialize, Serialize};
 /// Serialized as a camelCase string (e.g. `"metalOre"`).  This enum's
 /// `Ord` follows the GDD 14 resource catalog order so that sparse maps
 /// iterate deterministically.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum ResourceType {
     // ── Raw resources ──
@@ -116,7 +117,9 @@ impl Ord for ResourceType {
 // ─── Lane ID ──────────────────────────────────────────────────────────
 
 /// Orbital lane identifiers in increasing orbital radius order.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum LaneId {
     Inner,
@@ -128,7 +131,9 @@ pub enum LaneId {
 // ─── Game lifecycle ───────────────────────────────────────────────────
 
 /// Lifecycle states of the game session.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum GameLifecycle {
     Unloaded,
@@ -142,7 +147,9 @@ pub enum GameLifecycle {
 // ─── Entity roles and states ──────────────────────────────────────────
 
 /// Role of a ship.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum ShipRole {
     Cargo,
@@ -151,7 +158,9 @@ pub enum ShipRole {
 }
 
 /// Possible states of a ship.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum ShipState {
     Idle,
@@ -164,7 +173,9 @@ pub enum ShipState {
 }
 
 /// Station type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum StationType {
     Hub,
@@ -175,7 +186,9 @@ pub enum StationType {
 }
 
 /// Celestial body type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum BodyType {
     Planet,
@@ -184,7 +197,9 @@ pub enum BodyType {
 }
 
 /// Sub-type for planets.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum PlanetSubtype {
     RockyTerran,
@@ -194,7 +209,9 @@ pub enum PlanetSubtype {
 }
 
 /// Direction along a lane arc.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum ArcDirection {
     Clockwise,
@@ -204,7 +221,9 @@ pub enum ArcDirection {
 // ─── Destination references ───────────────────────────────────────────
 
 /// A destination for ship travel or logistics.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
 pub enum DestinationRef {
     Body { body_id: crate::id::BodyId },
@@ -214,7 +233,9 @@ pub enum DestinationRef {
 }
 
 /// A destination for cargo delivery (inventory transfers).
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
 pub enum InventoryDestinationRef {
     Station { station_id: crate::id::StationId },
@@ -224,7 +245,9 @@ pub enum InventoryDestinationRef {
 }
 
 /// A source for cargo pickup.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
 pub enum InventorySourceRef {
     Station { station_id: crate::id::StationId },
@@ -234,7 +257,9 @@ pub enum InventorySourceRef {
 // ─── Ship job ─────────────────────────────────────────────────────────
 
 /// Stage of a Transport job.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum TransportStage {
     ToPickup,
@@ -242,7 +267,9 @@ pub enum TransportStage {
 }
 
 /// The job a ship is performing.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
 pub enum ShipJob {
     Idle,
@@ -282,7 +309,9 @@ pub enum ShipJob {
 // ─── Build targets and states ─────────────────────────────────────────
 
 /// What a build order is constructing.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
 pub enum BuildTarget {
     Ship {
@@ -308,7 +337,9 @@ pub enum BuildTarget {
 }
 
 /// Build order lifecycle states.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum BuildState {
     AwaitingMaterials,
@@ -324,7 +355,9 @@ pub enum BuildState {
 // ─── Research ─────────────────────────────────────────────────────────
 
 /// Research project lifecycle states.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum ResearchState {
     AwaitingMaterials,
@@ -335,7 +368,9 @@ pub enum ResearchState {
 }
 
 /// Reason a research project was paused.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum ResearchPauseReason {
     Manual,
@@ -346,7 +381,9 @@ pub enum ResearchPauseReason {
 // ─── Survey orders ────────────────────────────────────────────────────
 
 /// Survey order lifecycle states.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum SurveyOrderState {
     Queued,
@@ -358,7 +395,9 @@ pub enum SurveyOrderState {
 // ─── Logistics reservations ───────────────────────────────────────────
 
 /// Reservation lifecycle states.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum ReservationState {
     AwaitingPickup,
@@ -370,7 +409,9 @@ pub enum ReservationState {
 // ─── Gate ─────────────────────────────────────────────────────────────
 
 /// Space Gate assembly phases.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum GatePhase {
     SitePreparation,
@@ -382,7 +423,9 @@ pub enum GatePhase {
 // ─── Commands ─────────────────────────────────────────────────────────
 
 /// Outcome of a command.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum CommandOutcome {
     Accepted,
@@ -391,7 +434,9 @@ pub enum CommandOutcome {
 }
 
 /// When a command takes effect.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum CommandApplicationBoundary {
     PausedImmediate,
@@ -402,7 +447,9 @@ pub enum CommandApplicationBoundary {
 ///
 /// Per GDD 13, `ErrorDetail` can be a string, bool, integer, null, or
 /// arrays of strings or integers.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(untagged)]
 pub enum ErrorDetail {
     String(String),
@@ -414,7 +461,9 @@ pub enum ErrorDetail {
 }
 
 /// Structured rejection information for a failed command.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(deny_unknown_fields)]
 pub struct CommandRejection {
     pub code: String,
@@ -424,7 +473,9 @@ pub struct CommandRejection {
 }
 
 /// Result payload produced by an accepted or applied command.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
 pub enum CommandResult {
     None,
