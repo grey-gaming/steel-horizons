@@ -636,7 +636,7 @@ Notes: Independent review completed via delegated subagent (deleg_a358ade3). One
 ```text
 Increment: P1-04
 Date: 2026-08-05
-Commit: <pending>
+Commit: 771ce89
 Requirements: GDD 13 §Identifiers and Resources (generated-ID prefixes); GDD 13 §Content Definitions; GDD 14 §Starting System Bodies, §Starting State, §Automatic Buffer Defaults, §Canonical Station Definitions
 Focused proof: `cargo test --locked` — 132 tests covering the content_validate module (28 table-driven invalid fixtures) plus all prior content, state, types, id, and command tests. Canonical content validates with zero errors. Every invalid fixture produces the expected error with a stable path.
 Cumulative gates: `cargo fmt --check` (clean), `cargo build --locked` (clean), `cargo clippy --locked -- -D warnings` (clean), `cargo test --locked` (132/132 pass)
