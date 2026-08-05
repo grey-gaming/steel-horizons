@@ -624,7 +624,7 @@ Notes: Independent review completed via delegated subagent (deleg_400e18c2). One
 ```text
 Increment: P1-03
 Date: 2026-08-05
-Commit: 4877f09
+Commit: 95e3cfb
 Requirements: GDD 13 §Content Definitions, §Serialized State DTOs; GDD 14 §Authored Content & Balance Catalog (complete starting bodies, deposits, recipes, technologies, ship/station statistics, Gate definition); TDD 04 §Quality Gates
 Focused proof: `content/definitions.v1.json` parses as `DefinitionsCatalog` and round-trips; `content/starting_system.v1.json` parses as `StartingScenario` and round-trips; `ContentCatalog` round-trips from both files. Exact record counts: 27 recipes, 23 technologies, 12 ships, 20 stations, 7 bodies, 19 slots, 4 starting techs, 6 stations with authored buffers/ship/states. Hub Haven output buffers in ResourceType order. RNG words match GDD 14 authoritative hex values. Schema regeneration is deterministic with no diff.
 Cumulative gates: `cargo fmt --check` (clean), `cargo build --locked` (clean), `cargo clippy --locked -- -D warnings` (clean), `cargo test --locked` (99/99 pass), schema export `--check` (no diff)
