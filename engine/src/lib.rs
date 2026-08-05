@@ -37,5 +37,8 @@ pub mod command;
 /// Serialized content definitions and loading.
 pub mod content;
 
+/// Content validation — structural and semantic rules.
+pub mod content_validate;
+
 /// Convenience re-export of the engine version.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

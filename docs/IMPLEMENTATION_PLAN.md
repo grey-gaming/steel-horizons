@@ -167,7 +167,7 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
   - Verify: schema regeneration has no diff; exact record/count/value fixtures cover 25 resource types, seven bodies, 19 slots, 27 recipes (11 refining, eight assembly, eight inverse), 23 technologies, 12 ship definitions, 20 station definitions, starting metadata/inventory/explicit fields, typed mechanic unlocks, build-work/default constants, and Gate values.
   - Depends on: P1-02b.
 
-- [ ] **P1-04 — Content validator: structural rules.**
+- [x] **P1-04 — Content validator: structural rules.**
   - Deliver: schema parsing, precise errors, unique IDs, authored/generated namespace separation, parent/body/slot validity, thresholds, statistics, starting capacities, and exact slot total.
   - Verify: table-driven invalid fixtures, each with stable path and typed failure.
   - Depends on: P1-03.
@@ -631,4 +631,16 @@ Cumulative gates: `cargo fmt --check` (clean), `cargo build --locked` (clean), `
 Scenarios activated: none (content/schema-only increment)
 Golden/hash changes: none (content files are versioned authored data; schemas are deterministic)
 Notes: Independent review completed via delegated subagent (deleg_a358ade3). One bug found and fixed: RNG words in starting_system.v1.json did not match GDD 14 hex values; corrected to authoritative decimal representations. Schema-export.sh updated with `--check` flag. 16 focused tests validate round-trip, record counts, ID uniqueness, body counts, slot totals, hub buffers, ship state, techs, metadata, gate definition, and recipe tech validity.
+```
+
+```text
+Increment: P1-04
+Date: 2026-08-05
+Commit: <pending>
+Requirements: GDD 13 §Identifiers and Resources (generated-ID prefixes); GDD 13 §Content Definitions; GDD 14 §Starting System Bodies, §Starting State, §Automatic Buffer Defaults, §Canonical Station Definitions
+Focused proof: `cargo test --locked` — 132 tests covering the content_validate module (28 table-driven invalid fixtures) plus all prior content, state, types, id, and command tests. Canonical content validates with zero errors. Every invalid fixture produces the expected error with a stable path.
+Cumulative gates: `cargo fmt --check` (clean), `cargo build --locked` (clean), `cargo clippy --locked -- -D warnings` (clean), `cargo test --locked` (132/132 pass)
+Scenarios activated: none (content-validation-only increment)
+Golden/hash changes: none
+Notes: Independent review completed. Dead code removed from `validate_gate_definition` (unused `expected_phases` array, `_pname`, empty if block). Added structural validation for Gate fields (`required_techs`, `manifest`, `logistics_priority`, `transfer_berths`, `minimum_fabricator_tier`, `required_deliveries`, `completion_consumption`). Added validation for `build_work`, `component_cost`, and `required_tech` on ship and station definitions. 8 new invalid-fixture tests cover these validation paths. Fixed pre-existing unused-variable warning (`sid` → `_sid`).
 ```
