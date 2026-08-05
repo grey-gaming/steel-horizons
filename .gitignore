@@ -1,5 +1,37 @@
-.DS_Store
+# Rust
+/target/
+**/*.rlib
+**/*.rmeta
+**/*.d
+!/.cargo/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
 *.swp
 *.swo
-*~
+
+# OS
+.DS_Store
 .DS_Store?
+
+# CI artifacts
+**/*.profdata
+**/*.gcda
+**/*.gcno
+
+# Generated content schemas (P1-03)
+schemas/content/
+
+# Developer saves (never commit)
+save.json
+connection.json
+logs/

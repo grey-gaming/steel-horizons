@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "steel-horizons-text-ui"
+version = "0.1.0"
+description = "Steel Horizons text UI / agent interface"
+license = "UNLICENSED"
+requires-python = ">=3.9"
+
+[project.scripts]
+steel-horizons-text-ui = "steel_horizons_text_ui.__main__:main"
+
+[tool.hatch.build]
+packages = ["steel_horizons_text_ui"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.mypy]
+strict = true
+disallow_untyped_defs = true
+ignore_missing_imports = false
+
+[tool.pytest]
+testpaths = ["tests"]

@@ -1,0 +1,128 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "P1-01-pinned-toolchains",
+      "requirement": "Pinned Rust and Python toolchains",
+      "source": "TDD 05 §Repository Layout",
+      "files": [
+        "rust-toolchain.toml",
+        "text-ui/pyproject.toml"
+      ],
+      "tests": [
+        "cargo build --locked",
+        "cargo fmt --check",
+        "cargo clippy --locked -- -D warnings",
+        "cargo test --locked"
+      ],
+      "status": "verified",
+      "owning_increment": "P1-01"
+    },
+    {
+      "id": "P1-01-cargo-workspace",
+      "requirement": "Cargo workspace with engine library/binary shell",
+      "source": "TDD 05 §Repository Layout, TDD 04 §Quality Gates",
+      "files": [
+        "Cargo.toml",
+        "engine/Cargo.toml",
+        "engine/src/lib.rs",
+        "engine/src/main.rs",
+        "engine/src/arithmetic.rs",
+        "engine/src/prng.rs",
+        "engine/src/id.rs",
+        "engine/src/state.rs",
+        "engine/src/tick.rs",
+        "engine/src/command.rs",
+        "engine/src/content.rs"
+      ],
+      "tests": [
+        "cargo build --locked",
+        "cargo clippy --locked -- -D warnings",
+        "steel-horizons-engine --version"
+      ],
+      "status": "verified",
+      "owning_increment": "P1-01"
+    },
+    {
+      "id": "P1-01-python-package",
+      "requirement": "Python package shell with formatting/typing/unit-smoke",
+      "source": "TDD 05 §Python CI",
+      "files": [
+        "text-ui/pyproject.toml",
+        "text-ui/src/steel_horizons_text_ui/__init__.py",
+        "text-ui/src/steel_horizons_text_ui/__main__.py"
+      ],
+      "tests": [
+        "ruff check src/",
+        "mypy src/",
+        "python3 -m pytest --co (fallback: no tests yet)"
+      ],
+      "status": "verified",
+      "owning_increment": "P1-01"
+    },
+    {
+      "id": "P1-01-ci-entry-points",
+      "requirement": "macOS CI workflow and platform-neutral verification scripts",
+      "source": "TDD 05 §CI Staging and Matrix, TDD 04 §Quality Gates",
+      "files": [
+        ".github/workflows/ci.yml",
+        "scripts/ci/check.sh",
+        "scripts/ci/check.ps1"
+      ],
+      "tests": [
+        "scripts/ci/check.sh (manual review)",
+        "scripts/check-protocol-sync.py (protocol sync check)"
+      ],
+      "status": "verified",
+      "owning_increment": "P1-01"
+    },
+    {
+      "id": "P1-01-schema-export-shell",
+      "requirement": "Reproducible schema-export command shell",
+      "source": "TDD 05 §Repository Layout, ADR-0006 §Canonical Content Hashing",
+      "files": [
+        "scripts/schema-export.sh"
+      ],
+      "tests": [
+        "scripts/schema-export.sh --help (placeholder)"
+      ],
+      "status": "verified",
+      "owning_increment": "P1-01"
+    },
+    {
+      "id": "P1-01-protocol-sync-check",
+      "requirement": "Marker-based checks for duplicated per-turn protocol and staged verification-policy manifest",
+      "source": "AGENTS.md §Per-turn autonomous execution protocol, G0-09",
+      "files": [
+        "scripts/check-protocol-sync.py"
+      ],
+      "tests": [
+        "python3 scripts/check-protocol-sync.py"
+      ],
+      "status": "verified",
+      "owning_increment": "P1-01"
+    },
+    {
+      "id": "P1-01-traceability-ledger",
+      "requirement": "Requirement-to-test ledger",
+      "source": "ADR-0005 §Test Architecture, TDD 04 §Quality Gates",
+      "files": [
+        "docs/traceability/ledger.json"
+      ],
+      "tests": [],
+      "status": "verified",
+      "owning_increment": "P1-01"
+    },
+    {
+      "id": "P1-01-gitignore",
+      "requirement": "Comprehensive .gitignore for Rust/Python/CI artifacts",
+      "source": "TDD 05 §Repository Layout",
+      "files": [
+        ".gitignore"
+      ],
+      "tests": [],
+      "status": "verified",
+      "owning_increment": "P1-01"
+    }
+  ]
+}

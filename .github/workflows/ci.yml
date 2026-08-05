@@ -1,0 +1,22 @@
+# Steel Horizons — macOS CI
+# P1-01: locked Rust build, formatting, Clippy, Rust smoke/unit tests,
+#         Python scaffold, protocol/policy-sync checks.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: ./scripts/ci/check.sh

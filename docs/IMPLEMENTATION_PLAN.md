@@ -147,7 +147,7 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
 
 ## Phase 1 — Foundation and executable contracts
 
-- [ ] **P1-01 — Repository, toolchain, CI, and traceability scaffold.**
+- [x] **P1-01 — Repository, toolchain, CI, and traceability scaffold.**
   - Deliver: pinned Rust and Python toolchains; Cargo workspace; engine library/binary shell; Python package shell; dependency locks; formatting, lint, unit-test, and macOS CI entry points; platform-neutral verification scripts for later Windows activation; requirement-to-test ledger; reproducible schema-export command shell; marker-based checks for the duplicated per-turn protocol and staged verification-policy manifest.
   - Verify: clean locked build, one Rust test, one Python scaffold test, formatter/linter gates, protocol/policy-sync checks, and `steel-horizons-engine --version`.
   - Depends on: G0-09.
@@ -583,4 +583,16 @@ Cumulative gates: Common Gate 0 document audit — passed; the per-turn protocol
 Scenarios activated: none (doc-only Gate 0)
 Golden/hash changes: none
 Notes: Audit repair stages REST at P1-14, polling at P1-31, WebSocket at P1-32, Python/TUI at P1-34, long agent clients as P1-35 qualification, Windows build/test CI as a P1-36 commit gate, and hashes/benchmark/artifacts/SBOM as P1-36 qualification. The complete Phase 1 gate remains mandatory.
+```
+
+```text
+Increment: P1-01
+Date: 2026-08-05
+Commit: 6cbdb73
+Requirements: TDD 04 §Quality Gates (P1-01 row); TDD 05 §Repository Layout, §CI Staging and Matrix, §Python CI; AGENTS.md §Verification order
+Focused proof: `cargo build --locked`, `cargo fmt --check`, `cargo clippy --locked -- -D warnings`, `cargo test --locked`, `python3 scripts/check-protocol-sync.py`, `ruff check src/`, `mypy src/`, `steel-horizons-engine --version`
+Cumulative gates: P1-01 gate set — all passed.
+Scenarios activated: none (P1-01 scaffold)
+Golden/hash changes: none (no golden tests yet)
+Notes: Independent review completed via delegated subagent (deleg_400e18c2). One minor fix applied: check.sh/check.ps1 pytest --co fallback message clarified. All verification gates pass cleanly.
 ```
