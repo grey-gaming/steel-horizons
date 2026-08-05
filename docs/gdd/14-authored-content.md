@@ -132,6 +132,13 @@ Renewable belt values represent density, not a consumable quantity. Every 1,000 
 
 The seven bodies provide **19 station slots**: 6 + 3 + 3 + 0 + 2 + 1 + 4.
 
+The starting JSON maps each body table directly to the complete GDD 13 record:
+`orbit_ring_count` is the length of `slot_counts`; finite deposits serialize
+`current = baseline = Amount`; renewable deposits serialize
+`current = baseline = Baseline`; and deposit arrays use ResourceType order. Names are
+the heading names, absent parents/subtypes are explicit `null`, and empty deposits or
+slot arrays are explicit `[]`.
+
 ## Starting State
 
 ### Hub Haven
@@ -163,7 +170,14 @@ Hub Haven's installed hull components are part of the station and are not loose 
 
 The kit deliberately bypasses technology locks for these pre-assembled units. Replacement production still requires the technology in the canonical recipe table.
 
-Each deployment-kit component is an output buffer whose `current = max` equals its quantity in the table and whose `export_threshold = 0`, so build orders can allocate it immediately. The seven component maxima total 19 of the Hub's 200 general capacity, leaving 181 for bootstrap refining/research buffers. Later component assembly expands/reconfigures output maxima explicitly. Input buffers are created/reallocated by valid production/research configuration; every buffer-max change must keep the total at or below 200. An input maximum cannot fall below `current + inbound_reserved`; an output maximum cannot fall below `current`, which already includes outbound-reserved units. Fuel is the separate `current = max = 200` compartment.
+Each deployment-kit component is an output buffer whose `current = max` equals its quantity in the table, `demand_threshold = 0`, and `export_threshold = 0`, so build orders can allocate it immediately. The seven component maxima total 19 of the Hub's 200 general capacity, leaving 181 for bootstrap refining/research buffers. Later component assembly expands/reconfigures output maxima explicitly. Input buffers are created/reallocated by valid production/research configuration; every buffer-max change must keep the total at or below 200. An input maximum cannot fall below `current + inbound_reserved`; an output maximum cannot fall below `current`, which already includes outbound-reserved units. Fuel is the separate `resource = Fuel`, `current = max = 200`, `demand_threshold = 20`, `export_threshold = 50` compartment.
+
+Every other Hub field is explicit in `starting_system.v1.json`: `input_buffers = []`;
+`docked_ship_ids = ["ship_builder_1"]`; `holding_ship_ids = []`;
+`max_docks = 2`; one idle slow component-assembly `ProductionSlot` with null recipe,
+empty maps, and zero progress/work fields; `mining_targets = []`;
+`active_research_id = null`; and `ship_build_queue = []`. The output buffers use
+ResourceType order. No other implicit station default is permitted.
 
 The Hub has a built-in Tier-1 research console. It can run one Tier-1 technology at a time without a Research Ship. Every project assigned to a Research Station requires a docked Research Ship, and Tier-2+ projects can run only there.
 
@@ -176,8 +190,16 @@ The Hub has a built-in Tier-1 research console. It can run one Tier-1 technology
 | Location | docked at `hub_haven` |
 | Fuel | 100 / 100 |
 | State | Idle |
+| Installed components | 1 StructuralFrame, 1 DriveAssembly, 1 ConstructionBay |
 
 No Cargo or Research Ship exists at tick 0.
+
+The complete serialized ship copies the Construction-T1 definition: position is
+Haven's exact system position; `docked_at = hub_haven`; base speed 3,000; base mass
+15; Cargo fields are null/zero; `build_cargo = {}` with capacity 20; Fuel and Life
+Support remainders are zero; build work is 1; survey work/depth are zero; `job = Idle`;
+and `travel_plan = null`. Hub Haven's dock list and the ship's `docked_at` field must
+agree.
 
 ### Starting Technologies
 
@@ -190,6 +212,7 @@ No Cargo or Research Ship exists at tick 0.
 
 | Field | Value |
 |-------|-------|
+| scenario ID | `starting_system` |
 | schema_version | 1 |
 | content_version | `v1` |
 | lifecycle | Paused |
@@ -199,6 +222,12 @@ No Cargo or Research Ship exists at tick 0.
 | generated ID counters | ship/station/build_order/reservation/salvage/survey_order all start at 1 |
 | gate_build | null |
 | RNG words | `[0x243f6a8885a308d3, 0x13198a2e03707344, 0xa4093822299f31d0, 0x082efa98ec4e6c89]` |
+
+`schema_version` is the engine-owned state-schema value used when constructing
+`GameState`; it is not duplicated in `StartingScenario` or included as authored
+content. `gate_build = null` is the explicit initialization rule from GDD 13. The
+remaining rows are serialized starting-scenario values. The initializer never injects
+inventory beyond the serialized Hub buffers.
 
 ## Automatic Buffer Defaults
 
@@ -210,6 +239,14 @@ Configuration commands allocate buffers deterministically so a newly configured 
 4. Research uses its full outstanding inbound amount rather than the 50-unit preference, as defined in GDD 4. Fuel requirements reserve the fixed Fuel compartment and do not allocate general buffers.
 
 All candidate resource keys are processed in ResourceType order, but preferred-versus-minimum is chosen for the complete set rather than partially allocating preferred buffers. Fuel always uses the separate Fuel compartment: `make_fuel`, `assemble_drive`, and Life Support research access it there rather than through general buffers.
+
+The exact `AuthoredDefaults` record is: new-station priority 50, preferred
+general-buffer maximum 50, input demand 100, output export 0, Fuel demand 20,
+Fuel export 50, mining retune 10 ticks, upgrade work 60 per tier crossed,
+demolition work 30, incremental survey depth work `[300, 600, 900]`, and Hub
+shipyard work 1 per tick. General input
+buffers serialize inactive `export_threshold = 0`; general outputs serialize inactive
+`demand_threshold = 0`.
 
 ## Canonical Refining Recipes
 
@@ -235,6 +272,12 @@ The three reclamation recipes are exact inverses. They prevent a player from sof
 
 The Station Hub assembles any unlocked non-Gate component at one unit per 30 ticks. A Construction Factory uses one 10-tick slot per unit. Gate Nodes require a Tier-4 Construction Factory.
 
+Accordingly, every non-Gate assembly record has exactly
+`[{ station_type: Hub, minimum_tier: 1, cycle_ticks: 30 },
+{ station_type: Construction, minimum_tier: 1, cycle_ticks: 10 }]` in that order.
+`assemble_gate_node` has only
+`{ station_type: Construction, minimum_tier: 4, cycle_ticks: 10 }`.
+
 | Recipe ID | Tech | Inputs | Output |
 |-----------|------|--------|--------|
 | `assemble_frame` | Structural Engineering | 4 Metals + 2 CarbonFiber | 1 StructuralFrame |
@@ -246,7 +289,15 @@ The Station Hub assembles any unlocked non-Gate component at one unit per 30 tic
 | `assemble_construction_bay` | Factory Automation | 1 StructuralFrame + 1 PowerCore + 2 ControlSystem | 1 ConstructionBay |
 | `assemble_gate_node` | Gate Construction | 4 Alloys + 1 PowerCore + 2 Optics + 1 ReactorRods | 1 GateNode |
 
-Every component recipe automatically has an exact inverse `disassemble_*` recipe at the same technology/facility tier and cycle length. Disassembly returns the complete listed inputs. This includes surplus Gate Nodes at a Tier-4 Construction Factory.
+Every component recipe has one exact inverse whose ID replaces the `assemble_`
+prefix with `disassemble_`: `disassemble_frame`, `disassemble_power_core`,
+`disassemble_control`, `disassemble_drive`, `disassemble_cargo_module`,
+`disassemble_research_lab`, `disassemble_construction_bay`, and
+`disassemble_gate_node`. Each inverse uses the same required technology, facility
+requirements, tiers, and cycle lengths as its assembly recipe, consumes that recipe's
+one output unit, and returns its complete input map. Thus the component catalog has
+exactly eight assembly and eight disassembly records. This includes surplus Gate Nodes
+at a Tier-4 Construction Factory.
 
 ## Canonical Technology Definitions
 
@@ -262,7 +313,7 @@ Costs and durations below are authoritative gameplay values, not examples.
 | `structural_engineering` | 1 | Basic Construction | 30 Metals + 20 CarbonFiber | 400 | StructuralFrame; Cargo/Construction T2 |
 | `sensor_systems` | 1 | Basic Control | 20 Metals + 30 SiliconWafers | 500 | Research Ship/Station T1; ResearchLab; Optics; survey depth 1 |
 | `fusion_power` | 1 | Basic Power | 30 Metals + 20 CarbonFiber + 10 Helium3 | 700 | ReactorRods; Hub T2 |
-| `cargo_handling` | 1 | Basic Construction | 30 Metals + 20 CarbonFiber | 400 | CargoModule; storage upgrades |
+| `cargo_handling` | 1 | Basic Construction | 30 Metals + 20 CarbonFiber | 400 | CargoModule |
 | `alloy_smelting` | 2 | Advanced Refining | 40 Metals + 20 RareEarthMinerals + 20 Chemicals | 1,200 | Alloys; Refinery T3 |
 | `factory_automation` | 2 | Structural Engineering + Cargo Handling | 40 Metals + 30 SiliconWafers + 10 ControlSystem | 900 | Construction Factory T1; DriveAssembly; ConstructionBay |
 | `deep_survey` | 2 | Sensor Systems + Alloy Smelting | 30 SiliconWafers + 20 Metals | 900 | Research Ship/Station T2; survey depth 2 |
@@ -279,6 +330,17 @@ Costs and durations below are authoritative gameplay values, not examples.
 | `system_bridge` | 4 | Gate Construction | 50 Alloys + 30 ReactorRods + 10 PowerCore | 1,200 | Space Gate assembly and activation |
 
 Tier names are progression labels; prerequisites, not a generic “complete N prior techs” rule, determine availability.
+
+Recipe, ship, and station availability is derived and validated from each definition's
+typed `required_tech`; it is not duplicated in `mechanic_unlocks`. The only independent
+mechanic records are: `sensor_systems -> SurveyDepth { max_depth: 1 }`,
+`deep_survey -> SurveyDepth { max_depth: 2 }`,
+`exploration_suite -> SurveyDepth { max_depth: 3 }`,
+`orbital_logistics -> AsteroidBeltOperations`,
+`life_support -> LifeSupportFuelFactor { numerator: 4, denominator: 5 }`,
+`gate_theory -> GateSiteVisibility`, and `system_bridge -> GateAssembly`. Every other
+technology has an empty `mechanic_unlocks` array. The validator rejects duplicate or
+contradictory mechanic records.
 
 ## Canonical Ship Definitions
 
@@ -311,6 +373,12 @@ Tier names are progression labels; prerequisites, not a generic “complete N pr
 
 Survey work requirements are 300 for depth 1, an additional 600 for depth 2, and an additional 900 for depth 3.
 
+Every ship definition also serializes `build_work` by tier as
+`[30, 60, 120, 240]`; the value is the same for all three roles at a tier.
+In `ShipStats`, `build_work_per_tick` is zero for Cargo and Research Ships and only
+Construction Ships use the table's positive build-work value. All other role-
+inapplicable numeric stats are likewise explicit zeroes under GDD 13.
+
 Research Ships have zero payload capacity. Cargo Ships use their cargo capacity and Construction Ships use their build-hold capacity in the common payload speed formula. For zero-capacity Research Ships, the multiplier is exactly 1/1 and the division is not evaluated.
 
 ## Canonical Station Definitions
@@ -333,6 +401,20 @@ Research Ships have zero payload capacity. Cargo Ships use their cargo capacity 
 Every non-Hub station has one dock at T1, two at T2, three at T3, and four at T4. Research ships powering projects occupy docks.
 
 Every newly completed station's Fuel compartment starts at 0 with demand threshold 20% and export threshold 50%; Hub Haven is the authored exception that starts at 200/200. Upgrading raises the maximum without creating Fuel. Fuel demand must remain less than or equal to its export threshold.
+
+Every `StationStats.production_slots` value is zero for Hub, Mining, and Research;
+Refinery and Construction use tiers 1/2/3/4 respectively. Zero cells in the cost table
+below are explanatory only: all ResourceType quantity maps are sparse, omit zero-valued
+keys, and serialize no required quantity as zero.
+
+A newly completed station copies its definition's type/tier/stats and exact moved
+component map. It begins with priority 50, empty input/output buffers, an empty Fuel
+compartment at the authored maximum, empty holding/mining/shipyard collections, null
+active research, and null built-in research (Hub Haven is the only console exception).
+It owns the exact number of idle zeroed recipe slots defined by GDD 13. The completing
+Construction Ship has an empty build hold and becomes Idle at/docked to the new
+station; the station's sorted docked-ship list contains it. No inventory, recipe,
+research capability, or Fuel is synthesized.
 
 ### Tier Unlocks
 
@@ -363,26 +445,40 @@ Upgrade cost is the target row minus the installed current-tier row. No componen
 
 Station build work is 60/120/240/480 for tiers 1–4. Ship build work is 30/60/120/240. Upgrade work is `60 * (target_tier - current_tier)` and demolition work is 30. A Construction Ship's work-per-tick stat applies to station, upgrade, demolition, and Gate work; Hub shipyard work advances at one work per tick.
 
+Every station definition serializes `build_work` by tier as
+`[60, 120, 240, 480]` for every station type. The remaining work constants come from
+the exact `AuthoredDefaults` record above rather than hidden engine literals.
+
+On upgrade completion, the delivered component delta moves into
+`installed_components`; tier, stats, dock limit, general capacity, and Fuel maximum
+become the target definition atomically without creating inventory or Fuel. Existing
+buffers, recipe progress/output, mining targets/remainders, research, queues,
+reservations, dock/holding order, priority, and Hub built-in-research value persist.
+New recipe-slot indices are appended as idle zeroed slots; increased mining target
+capacity creates no target until configured. The completing Construction Ship clears
+its build hold and becomes Idle at/docked to the upgraded station. Tier skipping uses
+the same rule once against the selected target definition.
+
 ## Space Gate Definition
 
 The Gate site is at lane `fringe`, radius 4,000, angle 0. `BeginGateAssembly { fabricator_ship_id }` requires `system_bridge` complete and an idle Tier-4 Fabricator, then creates the unique `GateBuild`, assigns that ship, and advertises the exact undelivered manifest at logistics priority 100. The site has one virtual cargo-transfer berth per tick and no general storage or orbit slot.
 
 Assembly prerequisites are `system_bridge` complete and the selected Tier-4 Fabricator. The cargo manifest is exactly:
 
-- 8 GateNodes
+- 8 `GateNode`
 - 1 StructuralFrame
 - 1 PowerCore
 - 1 ControlSystem
-- 1 ReactorRod for activation
+- 1 `ReactorRods` for activation
 
 | Phase | Work | Entry requirement |
 |-------|-----:|-------------------|
 | Site Preparation | 300 | Fabricator present |
-| Frame Assembly | 600 | 8 GateNodes + StructuralFrame delivered |
+| Frame Assembly | 600 | 8 `GateNode` + 1 `StructuralFrame` delivered |
 | Power Integration | 300 | PowerCore + ControlSystem delivered |
-| Activation | 120 | 1 delivered ReactorRod; consumed atomically on completion |
+| Activation | 120 | 1 delivered `ReactorRods`; consumed atomically on completion |
 
-Activation consumes one ReactorRod and immediately transitions the lifecycle to Won. Continuing post-victory play is outside V1.
+Activation consumes one `ReactorRods` unit and immediately transitions the lifecycle to Won. Continuing post-victory play is outside V1.
 
 ## Solvability Budget
 

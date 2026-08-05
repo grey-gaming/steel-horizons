@@ -20,7 +20,7 @@ These instructions apply to the entire repository. The canonical ordered backlog
 ## Non-negotiable invariants
 
 - Integer-only deterministic simulation state.
-- Checked integer arithmetic; overflow returns typed errors and never wraps or panics.
+- Checked gameplay/domain integer arithmetic; overflow returns typed errors and never wraps or panics. The sole exception is GDD 12's project-owned PRNG, whose named `u64` operations intentionally wrap modulo 2^64.
 - Stable iteration, a project-owned serialized PRNG, and recorded command order.
 - In the running application, the simulation actor is the sole mutable state owner; GDD 12's phase order is fixed and execution speed never affects state.
 - Exact real-time/batch, save/load, and command-replay equivalence.
@@ -91,13 +91,15 @@ On every implementation turn, follow this sequence without skipping steps:
 
 During Phase 1 development, every commit runs all gates activated so far, in this order:
 
-1. Rust formatting and Clippy with warnings denied.
-2. Content/schema validation.
-3. Unit and property tests.
-4. Every deterministic scenario activated so far (see the scenario activation matrix in the implementation plan). Scenarios whose owning increment has not yet completed are not required.
-5. HTTP/WebSocket API conformance — once the API transport exists (P1-14), these become mandatory on every commit.
-6. Save/load and command-log replay equivalence — once persistence exists (P1-13), these become mandatory on every commit.
-7. Python formatting, typing, and unit/integration tests — once the Python client exists (P1-34), these become mandatory on every commit.
+1. Repository synchronization and generated-file checks.
+2. Rust formatting, locked build, and Clippy with warnings denied.
+3. Every content/schema validation layer activated so far.
+4. Unit and property tests, including active Python scaffold/package tests.
+5. Every deterministic scenario activated so far in the implementation plan's gate activation matrix. Scenarios whose owning increment has not yet completed are not required.
+6. Save/load and command-log replay equivalence once persistence exists (P1-13).
+7. REST conformance from P1-14, HTTP event polling from P1-31, shared REST/WebSocket conformance from P1-32, and runtime hardening from P1-33.
+8. The cumulative generated Python client/TUI gate from P1-34a onward.
+9. Windows locked build and test CI once P1-36 exists.
 
 Platform CI: macOS runs every commit during Phase 1. Windows CI is added at P1-36.
 
@@ -105,7 +107,7 @@ Platform CI: macOS runs every commit during Phase 1. Windows CI is added at P1-3
 
 At Phase 1 completion, the full gate defined in the Phase 1 completion gate section of the implementation plan is mandatory.
 
-Nightly/pre-release gates add the Python agent play-tests, supported-platform state-hash comparison, and the V1-ceiling benchmark. Use the exact repository commands established by increment P1-01 rather than substituting ad hoc commands.
+P1-35 completion, nightly, pre-release, and Phase 1 completion runs add the four long Python agent play-tests. P1-36 completion and subsequent qualification runs also add supported-platform state-hash comparison, the V1-ceiling benchmark, private artifacts, and the SBOM. These long or platform-bound qualification checks are not ordinary every-commit gates. Use the exact repository commands established by increment P1-01 rather than substituting ad hoc commands.
 
 ## Safety and delivery boundaries
 

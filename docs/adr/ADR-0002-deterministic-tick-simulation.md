@@ -62,12 +62,17 @@ The engine owns an implementation of xoshiro256** and serializes all four `u64` 
 - Equal logistics candidates use the complete deterministic tie-break list in GDD 12.
 - Intermediate multiplication uses checked `u64`/`u128` operations.
 - Overflow returns a typed simulation error and never wraps or panics.
+- The only wrapping operations are the explicitly named xoshiro256** `u64`
+  transition/output operations, which are defined modulo 2^64 and golden-tested;
+  their wrapping helpers are not used by gameplay arithmetic.
 
 ## Consequences
 
 ### Positive
 
-- Save/load and batch/real-time equivalence are exact.
+- Save/load and batch/real-time equivalence are exact under ADR-0006's
+  replay-equivalence bytes and canonical deterministic event trace. Session control
+  receipts/event cursors are tested separately and never treated as gameplay state.
 - Agent play-tests can replay a command log rather than approximate wall-clock timing.
 - Cross-platform golden states are meaningful.
 - Concurrency at the API boundary cannot mutate partial tick state.

@@ -93,7 +93,15 @@ No player command is accepted during Advancing.
 
 ## Read and Streaming Flow
 
-The actor publishes an immutable `Arc<GameSnapshot>` after each commit. Queries clone the `Arc`, so a slow serializer cannot block mutation. Each snapshot contains `tick`, `latest_event_sequence`, lifecycle, schema/content versions, and complete state.
+The actor publishes an immutable `Option<Arc<GameSnapshot>>` after each commit. It is
+`None` in Unloaded and Loading and `Some` only for a stable published game; queries
+clone the `Arc`, so a slow serializer cannot block mutation. A separate immutable
+status publication always exposes runtime lifecycle/loading stage and the session
+cursor. Each game snapshot contains `tick`, the runtime session's
+`latest_event_sequence`, lifecycle, schema/content versions, and complete state. The
+session event allocator/ring survives game-state replacement; a loaded state's
+serialized counter is only a lower bound and is rebased before publication with a
+complete replacement delta.
 
 Committed transactions emit typed events to:
 
@@ -117,7 +125,7 @@ Clients read discovery data rather than assuming port 4880. Shutdown removes the
 
 ## Persistence
 
-The actor creates a normalized save snapshot. The persistence service writes to a same-directory temporary file, syncs it, renames it, and syncs the directory where supported. Saves include the next event sequence and bottleneck rolling windows but not the runtime event-retention ring. Saves from Running/Advancing load Paused; Won remains Won.
+Dequeuing `SaveNow` is the actor's FIFO committed-state barrier. It creates a normalized immutable snapshot containing every earlier accepted replayable command and no later mailbox work. One FIFO persistence worker owns the autosave target; SaveNow, autosave, LoadAutosave reads, and shutdown saves execute in actor enqueue order, so an older slow write cannot replace a newer snapshot and a load observes all successful prior barriers. The worker writes an ADR-0007 envelope to an exclusively created same-directory temporary file, syncs it, uses the platform atomic-replacement primitive, and syncs the directory where supported. Saves include the next event sequence and bottleneck rolling windows but not the runtime event-retention ring. Saves from Running/Advancing load Paused; Won remains Won.
 
 Autosave occurs every 300 committed ticks and after material Paused-state commands. Persistence failures emit durable errors without terminating the simulation.
 

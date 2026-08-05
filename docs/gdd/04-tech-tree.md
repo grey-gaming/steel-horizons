@@ -26,6 +26,16 @@ A Research Station project creates automatic `DockForResearch` work. During logi
 
 Pausing never destroys research value. Consumed materials stay credited to that technology, and resumption continues at the prior tick. The pause action may keep unused materials reserved or release them in place to the facility's ordinary buffers so normal logistics can use them. `NoResearchShip` projects resume automatically when an eligible ship docks; manually paused projects require `QueueResearch`/Resume.
 
+`QueueResearch` may reassign a non-complete project to another valid, unoccupied
+facility. The transaction first validates the complete target result, releases every
+unused old-facility reservation in place, clears the old assignment and Research Ship
+work, then reserves only physical stock at the target and advertises its remaining
+`required - consumed - reserved` demand. Completed ticks, consumed credit, and rational
+remainders persist; unused material never teleports. A Research Station without its
+required docked Research Ship is `Paused` with reason `NoResearchShip`. Hub Haven's
+authored Tier-1 console remains unique through Hub upgrades; Tier-2+ research always
+requires a Research Station (ADR-0012).
+
 ## Tier 0 — Starting Technology
 
 | Technology | Unlocks |
@@ -45,7 +55,7 @@ The deployment kit contains pre-assembled exceptions for recipes not yet unlocke
 | Structural Engineering | Basic Construction | Structural Frames; Cargo/Construction T2 |
 | Sensor Systems | Basic Control | Research Ship/Station T1, Research Labs, Optics, survey depth 1 |
 | Fusion Power | Basic Power | Reactor Rods, Hub T2 |
-| Cargo Handling | Basic Construction | Cargo Modules and storage upgrades |
+| Cargo Handling | Basic Construction | Cargo Modules |
 
 Sensor Systems has no Optics or Power Core cost; it is deliberately researchable from Haven's basic refined goods. It unlocks the Optics recipe immediately, while that recipe becomes runnable once Alloy Smelting provides a Tier-3 refinery; the deployment kit covers the first Research Lab pair until then.
 

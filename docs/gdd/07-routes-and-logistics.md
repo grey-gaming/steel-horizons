@@ -56,7 +56,7 @@ Selection order is:
 4. Lexicographically lowest canonical demand key (`station:<id>`, `build_order:<id>`, `evacuation:<id>`, or `gate_site`)
 5. Resource enum order
 
-The ship rejects pairs it cannot complete with its current fuel plus 10% reserve. A low-fuel ship seeks Fuel before ordinary work.
+The ship rejects pairs it cannot complete with its current Fuel plus 10% reserve. Every empty, unreserved idle role below `max_fuel` first evaluates the exact direct-refuel policy below.
 
 ## Reservation Lifecycle
 
@@ -106,11 +106,12 @@ Research Ships first serve survey orders sorted by descending queue priority, cr
 
 Route feasibility uses both legs and the ship's base mass plus cargo. If Fuel production fails:
 
-1. Ships with a reachable Fuel station take a Refuel job.
-2. An empty ship with no active reservation and no reachable source enters AwaitingRescue for exactly 300 ticks.
-3. The nearest existing Hub (route distance, then Hub ID) sends its solar tug, which tows the ship directly home at half base speed without ship Fuel. On docking it has zero Fuel and refuels normally.
+1. For each empty, unreserved idle ship below `max_fuel`, compute each station's direct-refuel stock from the phase-8 result: post-debit Fuel minus `AwaitingPickup` logistics reservations and production/research holds. The percentage export floor applies to Cargo supply, not local ship refueling. Phase-9 Cargo Fuel reservations reduce this fact budget in assignment order; direct-refuel jobs do not reserve it.
+2. Select a station with positive direct-refuel stock that the ship can reach by the exact ordinary Fuel simulator using its cloned remainders and completed Life Support state; tie-break by route distance, then Station ID. Refuel work precedes ordinary role work.
+3. If no source is reachable and the ship is already docked at a Hub, it waits and retries without self-rescue. Otherwise it enters AwaitingRescue for exactly 300 ticks.
+4. The nearest existing Hub (route distance, then Hub ID) sends its solar tug, which tows the ship directly home at half base speed without ship Fuel. On docking its pre-tow Fuel and both remainders are unchanged, and it retries direct refueling.
 
-The tug cannot carry cargo or do productive work. Route acceptance guarantees loaded/reserved ships have enough Fuel to finish, so entering AwaitingRescue with cargo or a loaded reservation is an invariant violation.
+The tug cannot carry cargo or do productive work. A Refuel arrival competes for a transactional dock. Phase 8 charges its final movement before transferring unreserved station Fuel, and same-tick arrivals allocate partial/zero stock in Ship ID order. Route acceptance guarantees loaded/reserved ships have enough Fuel to finish, so entering AwaitingRescue with cargo or an active reservation is an invariant violation.
 
 ## Buffer Configuration
 
@@ -137,7 +138,7 @@ For each destination/resource that remains below its demand target:
 
 Warnings are per destination/resource and advisory only. Suggested remedies include more ships, higher capacity, nearer supply, increased priority, or additional production. A warning clears after 300 ticks without the deficit.
 
-The 600 delivery buckets, cursor, rolling total, consecutive-deficit count, and warning flag are serialized. Save/load therefore preserves warning timing and event-sequence equivalence rather than silently resetting the observation window.
+The 600 delivery buckets, cursor, rolling total, consecutive-deficit and consecutive-clear counts, and warning flag are serialized. Save/load therefore preserves warning/clear timing and the canonical deterministic event payload; the server-session event envelope sequence is intentionally outside gameplay equivalence.
 
 ## Visualization
 

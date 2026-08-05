@@ -91,31 +91,39 @@ steel-horizons-engine [flags]
 
 There is no player-facing tick-rate flag. Tests use `AdvanceTicks` while Paused.
 
-## CI Matrix
+## CI Staging and Matrix
 
-OS/target pairs use an `include` matrix rather than an invalid Cartesian product:
+P1-01 establishes one platform-neutral repository entry point for each active
+gate and a macOS workflow that invokes those entry points. The initial workflow
+does not claim Windows coverage:
 
 ```yaml
 jobs:
-  test:
-    strategy:
-      matrix:
-        os: [macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+  test-macos:
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - run: cargo fmt --all -- --check
-      - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo run -p steel-horizons-engine --bin content_validate -- content/
-      - run: cargo test --workspace
+      - run: ./scripts/ci/check.sh
+```
 
-  build:
-    needs: test
+`scripts/ci/check.sh` (or the exact platform-neutral command established by
+P1-01) runs only gates whose owning increment is complete. It begins with the
+locked Rust/Python scaffold checks and grows cumulatively under ADR-0005 and
+TDD 04. Shell portability is not treated as proof that the commands passed on
+Windows.
+
+P1-36 adds the supported-platform jobs. OS/target pairs use an `include` matrix
+rather than an invalid Cartesian product:
+
+```yaml
+jobs:
+  test-supported:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: macos-latest
@@ -129,19 +137,52 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
+          components: rustfmt, clippy
           targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - run: ./scripts/ci/check.sh
+        if: runner.os != 'Windows'
+      - run: pwsh -File scripts/ci/check.ps1
+        if: runner.os == 'Windows'
       - run: cargo build --workspace --release --locked --target ${{ matrix.target }}
 ```
 
-The release job downloads both macOS thin binaries and combines them with `lipo -create`; a multi-target Cargo build alone does not create a universal binary. Windows is built only on Windows/MSVC runners.
+The Windows PowerShell entry point invokes the same ordered logical gates and
+arguments as the Unix entry point. P1-36's cross-platform job runs the same
+command-log fixture on the supported targets, compares ADR-0006 replay-equivalence
+canonical bytes/hashes, and uploads the two states plus first divergent canonical
+deterministic event on mismatch. Each hash
+result must come from executing the native binary on a runner with the stated
+OS and architecture; a successful cross-compiled build is not hash evidence.
+P1-36 records the actual reference-runner labels and versions used for
+qualification.
+
+The release job downloads both macOS thin binaries and combines them with
+`lipo -create`; a multi-target Cargo build alone does not create a universal
+binary. Windows is built only on a Windows/MSVC runner.
 
 ## Python CI
 
-The text UI uses a locked Python dependency file. CI installs it, runs formatting/type/unit tests, starts a release engine with an isolated temporary data directory, reads its discovery file, and runs protocol smoke tests. Full agent victory/stress runs are nightly and pre-release.
+The text UI uses a locked Python dependency file. P1-01 runs package-shell
+formatting, typing, and one unit smoke test. P1-14 adds focused generated-client
+tests against the REST walking skeleton. P1-34a activates the cumulative Python
+client/TUI gate, which expands through P1-34d to cover formatting, typing, unit
+tests, every renderer, real-engine integration, reconnect, and
+resynchronization. Every test starts the engine with an isolated temporary data
+directory and reads its discovery file.
+
+P1-35 makes its fast deterministic unit/schema tests and reusable fixtures
+cumulative, while its four long-running agent clients are qualification checks:
+they are required to complete P1-35 and thereafter run nightly, pre-release,
+and at Phase 1 completion, not on every ordinary commit. P1-36 adds Windows
+locked build/test CI to the ordinary cumulative gate. Its supported-platform
+hash comparison, stress benchmark, private packaging, and SBOM are qualification
+checks required to complete P1-36 and in later qualification runs.
 
 ## Release Process
 
-1. Every merge passes content validation, gameplay scenarios, API conformance, and supported-OS tests.
+1. Every merge passes every cumulative gate activated by its completed owning
+   increment; Windows locked build/test CI joins that set at P1-36.
 2. A version tag builds locked native artifacts.
 3. Cross-platform command-log hashes are compared.
 4. Binaries/content/SBOM are code-signed where applicable.

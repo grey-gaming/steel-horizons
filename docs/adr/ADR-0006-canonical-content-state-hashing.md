@@ -8,262 +8,280 @@ date: 2026-08-04
 
 ## Context
 
-Phase 1 requires deterministic verification that the same content definitions and
-game state produce identical results across builds, platforms, and save/load
-cycles. Two distinct hashes are needed:
+Phase 1 needs deterministic fingerprints for two different purposes:
 
-1. **Content hash** — a stable fingerprint of the authored JSON content files
-   (`content/definitions.v1.json`, `content/starting_system.v1.json`) that
-   changes only when the authoritative GDD 14 values change. Used by the content
-   validator (P1-05) to detect unintended drift and by the runtime to tag the
-   `content_version` string in `GameState`.
+1. A **content hash** identifies the exact validated authored definitions and
+   starting scenario used by a game.
+2. A **state hash** identifies a canonical `GameState` at a commit boundary.
 
-2. **State hash** — a deterministic fingerprint of the full canonical
-   `GameState` snapshot (GDD 13) at a given tick. Used by P1-08 to lock the
-   tick-zero golden, by scenario tests to assert exact state transitions, and
-   by the replay verifier to prove save/load equivalence.
-
-Neither hash is a checksum of a raw wire-format blob — both require canonical
-serialization rules so that JSON field ordering, whitespace, and numeric
-representation do not change the hash.
+Raw JSON file bytes are unsuitable because insignificant whitespace and object
+member order may differ. Rust's `Hash` implementations and Serde's ordinary
+JSON output are also not a persistent cross-version format. This ADR therefore
+defines one project-owned canonical JSON encoding and versioned SHA-256 hash
+schemes over that encoding.
 
 ## Decision
 
-### 1. Canonical Serialization (both content and state)
+### 1. Hash scheme identifiers and domain separation
 
-Every hashed value is produced by serializing the Rust struct to a `Vec<u8>`
-using Serde JSON with these settings:
+V1 uses SHA-256 with the scheme identifier:
 
-- `Serializer::new(&mut writer).canonical(true)` — or the equivalent manual
-  configuration: sorted keys (by field name for structs, by enum variant name
-  for externally tagged enums), no whitespace/newlines, and no escaping beyond
-  JSON's mandatory character escapes.
-- Maps use `BTreeMap<K, V>` so iteration order is the stable key ordering of
-  the key type. ResourceType and other enums use the `#[serde(enum_rep = "variant")]`
-  pattern with variant-name alphabetical ordering enforced at the Serde level
-  via `#[serde(rename_all = "camelCase")]` or explicit `#[serde(rename)]` where
-  the GDD 13 notation uses camelCase field names.
-- Sets use `BTreeSet<T>` with the same key-ordering rules.
-- Integers serialize as JSON numbers without leading zeros or trailing decimal
-  points. `u32`, `u64`, `i32` values write their base-10 representation.
-- Enum variants with data use the canonical Serde externally tagged form:
-  `{"VariantName": { ...fields... }}`. The variant name in the JSON tag uses
-  the Serde `rename_all` that matches the GDD 13 camelCase convention.
-- Option fields that are `None` are omitted entirely from the serialized object
-  (via `#[serde(skip_serializing_if = "Option::is_none")]` or equivalent).
-- Empty `BTreeMap`/`BTreeSet`/`Vec` values serialize as `{}`/`[]` and are
-  never omitted — a zero-length collection is meaningful state.
-- All `String` values encode as UTF-8 and JSON-string-escape only the minimum
-  required characters (`"`, `\`, control characters U+0000–U+001F).
+```text
+sha256-canonical-json-v1
+```
 
-The canonical serialization is NOT the general Serde JSON output — Serde JSON
-by default uses `BTreeMap` key ordering but does NOT guarantee sorted struct
-fields or omit `None` fields in a deterministic way across Serde versions.
-Therefore the canonical path is an explicit helper:
+The bytes given to SHA-256 are a domain prefix, one zero byte, then the
+canonical JSON bytes:
 
-```rust
-/// Serialize `value` into `writer` using the canonical content/state encoding.
-/// Every consumer (content hash, state hash, save file, golden snapshot) uses
-/// this function so that all fingerprints are comparable.
-pub fn serialize_canonical<T: Serialize>(
-    value: &T,
-    writer: impl io::Write,
-) -> Result<(), serde_json::Error> {
-    let mut ser = serde_json::Serializer::new(writer);
-    ser.sort_keys(true);
-    // No pretty-printing: compact output with sorted keys.
-    // Serde JSON's default omits `None` fields when the field has
-    // `#[serde(skip_serializing_if)]` — that is the correct behavior.
-    value.serialize(&mut ser)
+```text
+content:
+  "steel-horizons/content/sha256-canonical-json-v1" || 0x00 || canonical_json
+
+scenario state:
+  "steel-horizons/state/scenario/sha256-canonical-json-v1" || 0x00 || canonical_json
+
+replay-equivalence state:
+  "steel-horizons/state/replay/sha256-canonical-json-v1" || 0x00 || canonical_json
+
+save-integrity state:
+  "steel-horizons/state/save/sha256-canonical-json-v1" || 0x00 || canonical_json
+```
+
+All prefix characters are the displayed ASCII bytes. Domain separation prevents
+a content document and state document with coincidentally equal JSON from
+sharing a digest and distinguishes the three state projections.
+
+Every externally stored hash is exactly 32 digest bytes encoded as 64 lowercase
+hexadecimal characters. Uppercase, shortened, or prefixed hexadecimal strings
+are invalid. Changing the hash function, domain prefix, or canonical byte rules
+creates a new scheme identifier; it never silently changes V1 goldens.
+
+### 2. JSON shape precedes canonicalization
+
+Canonicalization operates on the JSON value produced by the approved serialized
+schema; it does not choose the schema itself.
+
+- Field names are `snake_case`.
+- Tagged variant names are PascalCase.
+- Each enum's unit/external/internal/adjacent tagging representation is part of
+  its generated schema. Commands retain ADR-0003's explicit `type` tag.
+- All fields of canonical content and state structs are present. An `Option`
+  whose value is `None` is encoded as JSON `null`; canonical content/state types
+  must not use `skip_serializing_if`.
+- Empty maps, sets, and vectors are present as `{}` or `[]`.
+- Maps that do not have JSON-string keys must be represented by an explicitly
+  ordered array shape in their schema rather than relying on serializer-specific
+  map-key coercion.
+
+Schema changes are governed by the content/state version rules. Canonicalization
+never repairs, defaults, or drops a field.
+
+### 3. Canonical JSON v1 byte encoding
+
+The canonical writer accepts a duplicate-free JSON value and emits bytes using
+the following complete rules:
+
+1. **Objects:** Sort member names by ascending UTF-8 byte sequence. Emit members
+   in that order as `{` + comma-separated canonical name/value pairs + `}`.
+   There is no whitespace. Duplicate member names are rejected while parsing;
+   last-key-wins parsing is forbidden on canonical inputs.
+2. **Arrays:** Preserve schema/collection order exactly and emit canonical
+   elements separated by commas, with no whitespace.
+3. **Strings:** Emit valid UTF-8 between double quotes. Escape `"`, `\\`,
+   backspace, tab, LF, form feed, and CR as `\"`, `\\`, `\b`, `\t`, `\n`,
+   `\f`, and `\r`. Escape every other U+0000 through U+001F code point as a
+   lowercase `\u00xx` sequence. Do not escape `/` or non-ASCII scalar values,
+   and do not apply Unicode normalization.
+4. **Integers:** Emit the shortest base-10 representation, with no leading `+`
+   or zeros. Zero is `0`; the checked parser rejects a lexical negative-zero
+   token. The writer accepts only JSON integers representable as `i64` or `u64`;
+   the typed schema subsequently enforces each field's narrower declared type.
+5. **Other scalars:** Emit exactly `true`, `false`, or `null`.
+6. **Floating point:** Reject all floating-point JSON numbers, including
+   mathematically integral forms such as `1.0`, and reject non-finite values.
+
+Object sorting is a serialization rule only. Simulation iteration order remains
+the explicit domain order—for example, GDD 13's declared `ResourceType` order.
+These two orders must not be conflated.
+
+The implementation must not depend on a nonexistent "canonical mode" in
+`serde_json`. The project helper follows this algorithm explicitly: serialize a
+typed value into a checked JSON value, reject floats/duplicates or unsupported
+map keys, recursively write the canonical bytes, and stream those bytes to the
+selected SHA-256 domain. All stages return typed errors; canonical serialization
+and hashing never call `unwrap`, `expect`, or panic in production paths.
+
+### 4. Collection ordering before JSON encoding
+
+Canonical object sorting makes map insertion order irrelevant. Domain
+collections still have deterministic in-memory and array serialization rules:
+
+- Serialized keyed collections use `BTreeMap` with an explicitly tested `Ord`.
+- Serialized sets use `BTreeSet`; their JSON array elements appear in that
+  `Ord` order.
+- ID newtypes order by their complete identifier string.
+- Domain enums that require authored declaration order implement/test that order
+  explicitly; Serde rename text does not define Rust `Ord`.
+- Semantically ordered vectors retain their defined FIFO/phase/sequence order.
+- Semantically unordered content record lists are normalized to their documented
+  stable key order before hashing, or represented as string-keyed maps.
+
+P1-02b serialization fixtures lock field names, tags, nulls, and collection
+orders. P1-05/P1-08 exact-byte fixtures then lock the canonical writer itself.
+
+### 5. Canonical content hash input
+
+The content hash covers the two validated V1 content roots as one explicit
+object:
+
+```json
+{
+  "definitions": { "...": "the complete definitions.v1.json value" },
+  "starting_system": { "...": "the complete starting_system.v1.json value" }
 }
 ```
 
-### 2. Hash Function
+This conceptual `CanonicalContentHashInput` is constructed from the fully
+validated typed `DefinitionsCatalog` and `StartingScenario`; it is not a byte
+concatenation of files. It includes every field in both typed roots, including
+their version fields, authored defaults, Gate definition, bodies, deposits,
+starting entities, inventory, and starting metadata.
 
-Both hashes use **SHA-256** (from the `sha2` crate or Rust's standard library
-`std::hash::Hash` — specifically `sha2::Sha256` via the `Digest` trait).
+Excluded are file names, directory paths, modification times, raw whitespace,
+encoding markers, and generated JSON Schema annotations. Unknown fields,
+duplicate keys, invalid record order, or schema-invalid values fail content
+validation before hashing; they are not silently discarded.
 
-Rationale:
+The content digest is:
 
-- SHA-256 is widely available, fast, and collision-resistant at a
-  cryptographic level. The simulation does not need defence against malicious
-  manipulation, but using a well-known hash avoids custom hash-bias questions.
-- No salting, no length-prefix complications beyond the canonical encoding.
-- The output is exactly 32 bytes / 64 hex characters for display/comparison.
-
-### 3. Content Hash
-
-The content hash covers:
-
-- **Included:** Every field in every record of `content/definitions.v1.json`
-  and `content/starting_system.v1.json`. This means `ShipDefinition`,
-  `StationDefinition`, `RecipeDefinition`, `TechDefinition`, `ShipStats`,
-  `StationStats`, `FacilityRequirement`, `ResourceDeposit`, `CelestialBody`,
-  the starting-state records (Hub, ship, metadata, deployment kit), and every
-  authored value in GDD 14.
-
-- **Excluded:** The outer envelope (file name, file modification timestamp,
-  file size, encoding marker). The hash is computed from the canonical JSON
-  byte sequence of the combined content records, **not** from the raw file
-  bytes, so platform line-ending variation and whitespace differences do not
-  affect it.
-
-- **Version tag:** The content_version string is `v1` and is included in
-  `GameState.content_version`. If the content file is re-constituted from GDD
-  14, the canonical content hash must match a committed golden. Any change to
-  GDD 14 that affects the content records updates the golden hash as part of
-  the same increment.
-
-Implementation:
-
-```rust
-pub fn content_hash(content: &ContentCatalog) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    serialize_canonical(content, &mut hasher).expect("canonical serialization");
-    hasher.finalize().into()
-}
+```text
+SHA-256(content-domain-prefix || 0x00 || canonical(CanonicalContentHashInput))
 ```
 
-### 4. State Hash
+The committed golden is `tests/goldens/content_hash.txt`. The runtime validates
+the loaded catalog against that golden and carries the computed digest into each
+save envelope under ADR-0007. `GameState.content_version` remains a human-readable
+compatibility label, not a substitute for this exact digest.
 
-The state hash covers:
+### 6. Canonical state projections
 
-- **Included:** Every field of `GameState` and every transitively contained
-  struct (CelestialBody, Station, Ship, ResearchProject, SurveyOrder,
-  BuildOrder, SalvageCache, GateBuild, Reservation, BottleneckTracker,
-  RNGState, IdCounters, CommandRecord) as defined in GDD 13. This includes
-  `schema_version`, `content_version`, `lifecycle`, `tick`, counters, and
-  every mutable gameplay field.
+All projections start from a cloned complete approved `GameState`. Equivalence
+projections first apply lifecycle normalization (`Running`/`Advancing` to `Paused`;
+`Paused` and `Won` unchanged). This removes execution-control mode, not gameplay.
+Unloaded/Loading have no valid projection.
 
-- **Excluded:**
-  - The `command_log` field is excluded from the canonical state hash for
-    scenario-test assertions but included for save/load and replay equivalence
-    verification. Two modes:
-    - **Scenario hash (no command_log):** Used by scenario tests (P1-10+) and
-      the tick-zero golden (P1-08). Commands are recorded but their sequence
-      is part of the test input, not the expected output state.
-    - **Replay hash (with command_log):** Used by save/load and replay
-      verification (P1-13+). The full command log must reconstruct an
-      identical GameState after save/load, so it is included.
-  - The event retention ring (runtime-only, not serialized in saves).
-  - Supply/demand tables (derived, rebuilt every tick).
-  - Presentation/camera data.
-  - File format envelope (file name, timestamps).
+#### Scenario projection
 
-- **Struct field ordering:** All structs use `#[serde(rename_all = "camelCase")]`
-  and Serde's default field ordering (the order they appear in the Rust source)
-  for the canonical serialization. This is deterministic within one Rust
-  compiler version. If a field is added or reordered, the hash changes by
-  design and the golden updates.
+The scenario projection removes exactly the top-level `command_log` and
+`next_event_sequence` members and retains every other top-level and transitive
+field. Removal fails if either member is absent or malformed; a separately mirrored
+Rust view that could forget future fields is not permitted. It is hashed with the
+scenario-state domain prefix.
 
-Implementation:
+This projection is used by the tick-zero golden and deterministic gameplay
+scenario assertions. Commands are test inputs rather than part of the asserted
+gameplay state.
 
-```rust
-/// Compute the canonical scenario-test state hash (excludes command_log).
-pub fn state_hash_scenario(state: &GameState) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    let state_for_hash = StateHashView {
-        // All fields except command_log
-        schema_version: &state.schema_version,
-        content_version: &state.content_version,
-        lifecycle: &state.lifecycle,
-        tick: &state.tick,
-        // ... all other fields mirrored from GameState
-        command_log: &[], // excluded
-    };
-    serialize_canonical(&state_for_hash, &mut hasher).expect("canonical serialization");
-    hasher.finalize().into()
-}
+#### Replay-equivalence projection
 
-/// Compute the full replay/save-load hash (includes command_log).
-pub fn state_hash_replay(state: &GameState) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    serialize_canonical(state, &mut hasher).expect("canonical serialization");
-    hasher.finalize().into()
-}
-```
+The replay-equivalence projection removes exactly `next_event_sequence` and includes
+the complete `command_log`, its payloads, order, effective ticks, server sequences,
+and outcomes. It is hashed with the replay-state domain prefix.
 
-In practice, the two modes are implemented by a `HashMode` enum passed to a
-single hashing helper that conditionally serializes `command_log` as an empty
-array when excluded.
+This projection is used for uninterrupted/real-time/batch/save-split/command-replay
+equivalence. The removed value is a server-session event-stream lower bound: actor
+controls and same-process state replacement can advance/rebase it without changing
+simulation semantics. Runtime event retention, derived supply/demand tables,
+presentation state, and the outer save envelope are absent because they are not
+fields of `GameState`.
 
-### 5. Content Version String
+#### Save-integrity projection
 
-`GameState.content_version` is the string `"v1"`. It is **not** the content
-hash itself — it is a version label that remains stable as long as the content
-record shapes are compatible. The content hash is validated at startup and
-logged, but the version label is the migration/compatibility key. A breaking
-content schema change bumps the version label and triggers the schema-migration
-path.
+The save-integrity projection is the complete lifecycle-normalized `GameState`,
+including both `command_log` and `next_event_sequence`. It is hashed with the save-
+state domain prefix. It protects the exact persisted cursor lower bound even though
+that session bookkeeping is deliberately excluded from deterministic equivalence.
 
-### 6. Golden-Update Policy
+Exact event equivalence uses a parallel canonical deterministic trace. It retains the
+committed tick and complete payloads for ordinary ticks, replayable-command outcomes,
+and domain events; removes the runtime `event_sequence`; removes
+`next_event_sequence` from StateDelta roots; and excludes actor-control outcome,
+control-only lifecycle/StateDelta, and RuntimeError events. Those excluded records are
+server-session observations, not command-log replay inputs. Their ordering,
+idempotency, retention, and resynchronization remain mandatory protocol tests under
+ADR-0012.
 
-A golden file (content hash golden, tick-zero state hash golden, or scenario
-state golden) is the committed expected output of the deterministic hash
-function over canonical serialization.
+All three functions return `Result<[u8; 32], CanonicalHashError>`. Tests also expose
+the canonical bytes so a failure can report the first byte/value divergence
+rather than only opaque digests.
 
-- **When to update:** Only when an increment intentionally changes an
-  authoritative GDD/GAME rule that affects the serialized content or state.
-  Golden changes must be explained in the increment's evidence log with the
-  exact reason and the changed authoritative section.
+### 7. Save state hash
 
-- **Review process:** The diff of the golden file is reviewed alongside the
-  production/content changes in the same increment. The CI gate fails if the
-  golden does not match the computed hash unless the increment explicitly
-  records the golden update.
+ADR-0007's `state_hash` is exactly the save-integrity digest of the normalized
+`game_state` stored in the envelope. A loader canonicalizes the nested JSON value
+under the envelope's declared hash scheme and verifies the digest before any
+schema migration. This is an accidental-corruption/integrity check, not an
+authentication mechanism; a party able to edit the save can also recompute an
+unkeyed digest.
 
-- **CI behavior:** Every commit runs content-hash and state-hash checks for the
-  tick-zero golden. Scenario test assertions compare against committed goldens.
-  A hash mismatch fails the CI gate and must be resolved by either (a) updating
-  the golden with an explained reason, or (b) fixing the code to restore the
-  prior hash.
+The envelope separately stores `content_hash`. State integrity and exact content
+compatibility are distinct checks and both are mandatory.
 
-- **Content-hash golden path:** `tests/goldens/content_hash.txt` — hex-encoded
-  64-character SHA-256 of canonical content.
+### 8. Golden-update policy
 
-- **Tick-zero state-hash golden path:** `tests/goldens/state_hash_tick0.txt` —
-  hex-encoded SHA-256 of canonical GameState at tick 0 (Paused, authored
-  starting state, scenario-hash mode).
+A golden changes only with an intentional authoritative content/state rule,
+serialized-schema change, or reviewed canonicalization/hash-scheme change.
 
-- **Scenario goldens:** Named files under `tests/goldens/scenarios/` per
-  scenario, e.g. `bootstrap_to_first_cargo.state_hash`.
+- The same increment updates the authoritative document, implementation,
+  affected fixtures/tests, and evidence-log explanation.
+- CI never updates goldens automatically. An unexplained mismatch fails.
+- Review includes the old/new canonical bytes or a focused semantic diff, not
+  only the two digest strings.
+- Reordering an in-memory insertion sequence must not change a golden. A schema
+  order change may change it only when that order is semantically serialized.
 
-### 7. Save File Hash
+Golden paths:
 
-The save file (P1-13) includes a SHA-256 of the canonical `GameState` as an
-integrity check within the save envelope. This is the replay-mode hash (with
-`command_log`). The save load verifies the hash matches before accepting the
-file. This is NOT a content/state golden — it is a runtime integrity check that
-has no golden file.
+- `tests/goldens/content_hash.txt`
+- `tests/goldens/state_hash_tick0.txt`
+- `tests/goldens/scenarios/<scenario>.state_hash` where a scenario intentionally
+  uses a full-state golden
+
+Under the cumulative Phase 1 CI policy, content-hash checks become mandatory at
+P1-05, tick-zero state-hash checks at P1-08, and each scenario golden at its
+owning increment. Once activated, each remains mandatory on every later commit.
+
+### 9. Required executable proofs
+
+- Canonical byte fixtures cover nested object sorting, non-ASCII strings, every
+  escape, signed/unsigned boundaries, nulls, empty collections, and float/
+  duplicate-key rejection.
+- Property tests permute object/map insertion order and obtain identical bytes
+  and hashes.
+- Serialization snapshots lock snake_case fields and tagged enum shapes.
+- Projection tests prove that changing only `command_log` changes replay/save hashes
+  but not scenario, while changing only `next_event_sequence` changes save integrity
+  but neither equivalence hash. Running and Advancing normalize to the same Paused
+  equivalence bytes.
+- Cross-platform CI compares canonical bytes before comparing hashes, making an
+  encoding discrepancy diagnosable.
+- Save tests recompute both content and save-integrity hashes independently from
+  envelope values.
 
 ## Consequences
 
-- **Positive:** Every content change and state change produces a deterministic,
-  reviewable fingerprint. Scenario tests can assert exact hashes instead of
-  diffing entire JSON blobs. Save/load replay gains a cheap integrity check.
-
-- **Positive:** The same canonical serialization is used for content hashing,
-  state hashing, save files, and golden snapshots — one code path, no drift
-  between them.
-
-- **Negative:** Adding a new field to any serialized struct changes every state
-  hash that includes that struct. This is intentional and forces explicit
-  golden updates with documented reasons.
-
-- **Negative:** SHA-256 adds a dependency (`sha2` crate) that is not in the
-  Rust standard library. The dependency is small, pure-Rust, and widely used.
-  An alternative is to use `std::hash::Hash` with a stable hasher, but that
-  would require a custom `StableHasher` that matches the canonical
-  serialization, adding more code than the `sha2` crate.
-
-- **Negative:** The canonical serialization helper adds a small maintenance
-  surface. If Serde JSON changes its `sort_keys` semantics, the golden hashes
-  change. Pinning the `serde_json` dependency version and testing golden
-  stability in CI mitigates this.
+- Content and state fingerprints are stable across supported platforms and do
+  not depend on Rust source-field order or ordinary JSON map insertion order.
+- The scheme identifier and domain prefixes make future hash evolution explicit.
+- Exact content identity travels with saves, while `content_version` continues to
+  describe compatibility/release lineage.
+- The project owns a small canonical writer and duplicate-key parser/check. That
+  maintenance cost is accepted and covered by exact-byte/property fixtures.
+- Adding or changing a serialized field intentionally changes affected hashes
+  and requires a reviewed golden update.
 
 ## Related ADRs
 
-- ADR-0002 — Deterministic Tick Simulation (establishes deterministic state
-  as a non-negotiable invariant)
-- ADR-0005 — Test Architecture (defines golden snapshots and content
-  validation; this ADR fills in the exact hashing mechanics)
+- ADR-0002 — Deterministic Tick Simulation
+- ADR-0005 — Test Architecture
+- ADR-0007 — Save Envelope Format, Content Hash Placement, and Migration Fixtures

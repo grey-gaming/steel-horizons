@@ -89,24 +89,26 @@ The simulation actor is the only owner allowed to mutate `GameState`. At each ti
 Phases execute in this immutable order:
 
 1. **Apply scheduled commands**
-2. **Ship movement and arrival transactions**
+2. **Ship movement, dock admission, and arrival transactions/facts**
 3. **Station processing and completed production cycles**
-4. **Mining extraction**
+4. **Mining drift, retune, and extraction reducers**
 5. **Construction progress**
 6. **Survey progress**
 7. **Research progress and rational resource consumption**
-8. **Fuel consumption from phase-2 actual movement**
+8. **Fuel debit and admitted refuel transfers from phase-2 facts**
 9. **Logistics table rebuild and deterministic job assignment**
 10. **Bottleneck monitoring**
 11. **Victory check, atomic commit, and event emission**
 
-Gameplay state is read from the committed tick-N snapshot; inventory or entity mutations staged by one phase are not visible to later phases until commit. The sole cross-phase inputs are explicit immutable tick facts—for example, phase 8 receives the actual distance measured by phase 2, and phase 11 receives the pending transaction for validation and event construction. Cargo that arrives in phase 2 becomes committed at the end of the tick and is first available to station processing on the following tick.
+Gameplay state is read from the committed tick-N snapshot; inventory or entity mutations staged by one phase are not visible to later phases until commit. The sole cross-phase inputs are explicit immutable tick facts—for example, phase 8 receives phase-2 actual-distance/arrival facts plus Fuel debit/hold/release facts from phases 1, 2, 3, and 7; phase 9 receives the resulting post-phase-8 ship Fuel and unreserved station-Fuel budgets; phase 4 extraction consumes its own checked drift-density facts; and phase 11 receives the pending transaction for validation and event construction. Named reducers combine competing writes such as shared-deposit extraction and station/ship Fuel transfers. Cargo or production that credits Fuel during the tick becomes committed at the end and is first available to station processing or refueling on the following tick.
 
 ## Production Cycles
 
 ### Mining
 
-Finite-deposit mining uses the standard rate accumulator and transfers whole units into output buffers whenever the accumulator crosses 1,000. Extraction decrements finite deposits by exactly the amount produced. Renewable belt mining uses a denominator-specific accumulator because density ratios need not divide 1,000: each tick adds `base_quantity * current_density` with denominator `cycle_ticks * baseline_density`. Belt deposits are not decremented; their current density is updated by the deterministic shift event.
+Finite-deposit mining uses the standard rate accumulator and transfers only whole units that fit in the configured output buffer. A full buffer stalls without advancing the accumulator. With partial space, potential whole-unit throughput above the space is discarded for that tick, but a finite deposit is decremented by exactly the units actually stored—never by discarded throughput. Targets sharing one body/resource deposit submit intents reduced by Station ID then serialized mining-slot index against one phase-local remaining budget. Exhausting the deposit resets every configured target's fractional credit for it.
+
+Renewable belt mining uses a denominator-specific accumulator because density ratios need not divide 1,000: each tick adds `base_quantity * current_density` with denominator `cycle_ticks * baseline_density`. Belt deposits are not decremented. For a transaction from tick N to `resulting_tick = N + 1`, a multiple-of-1,000 drift is computed first in Body ID/ResourceType order, published as an immutable density fact, and used by that transaction's extraction. Mining slots and ten-tick retune countdowns are serialized; a retune suppresses exactly ten simulation ticks and resets its accumulator as specified by ADR-0010.
 
 ### Refining and Component Assembly
 
@@ -165,12 +167,24 @@ Jobs persist until completion or explicit cancellation:
 | Role | Jobs |
 |------|------|
 | Cargo | Transport to Station/GateSite, Refuel, Idle |
-| Construction | Build, Upgrade, Demolish, Idle |
-| Research | SurveyOrder, DockForResearch, Idle |
+| Construction | Build, Upgrade, Demolish, Refuel, Idle |
+| Research | SurveyOrder, DockForResearch, Refuel, Idle |
 
-Cargo ships low on fuel take a Refuel job before transport work. Job feasibility includes the ship-to-source leg, the loaded delivery leg, and a reserve of `max_fuel / 10` (all authored capacities divide by 10). Construction and survey/docking assignments likewise require the destination plus that reserve. Consequently, only an empty ship with no active reservation may enter `AwaitingRescue`. Choose the nearest existing Station Hub by route distance, then Hub ID. After a 300-tick dispatch wait, its solar tug tows the ship directly to that Hub at `base_speed_milli / 2`; tow movement consumes no ship Fuel and carries no payload. On arrival the ship has zero Fuel, `docked_at` names the Hub, its state/job become Idle, and it refuels normally. Cargo or an active loaded reservation in AwaitingRescue is an invariant violation.
+Every empty, unreserved idle ship with `fuel < max_fuel` seeks direct refueling before ordinary role work. A refuel source needs at least one unreserved Fuel unit after subtracting `AwaitingPickup` outbound reservations plus production and research holds. Direct station refueling is local consumption and may use stock below the Cargo export-threshold floor. Choose the reachable source by route distance then Station ID. Reachability simulates the ordinary zero-payload route using cloned Fuel and Life Support remainders, the actual completed-tech set, final-segment capping, and checked arithmetic; no 10% reserve is required because a station is the destination.
+
+Phase 2 admits a Refuel arrival to a transactional dock and records a fact. Phase 8's shared Fuel reducer first debits final movement, honors every existing/new logistics, production, and research Fuel hold/debit, then processes admitted refuel facts in Ship ID order. It publishes immutable post-phase-8 ship values and per-station unreserved budgets for phase 9. That phase uses only those facts for Fuel supply/refuel selection/route feasibility and reduces the budget as it creates Cargo Fuel reservations. A direct-refuel assignment reserves nothing, so a later transfer may be partial or zero. Same-tick delivery/production credits are unavailable until the next tick. A below-full ship already docked at a Hub with no available Fuel waits there; it never dispatches a tug to itself. Otherwise an empty, unreserved ship with no reachable source enters `AwaitingRescue`. The nearest existing Hub by route distance then Hub ID dispatches after 300 ticks and tows it directly at `base_speed_milli / 2`; tow movement consumes no ship Fuel and carries no payload or Fuel mutation. Cargo or an active reservation in AwaitingRescue is an invariant violation.
+
+Ordinary job feasibility still includes the ship-to-source leg, loaded delivery leg, and a reserve of `max_fuel / 10` (all authored capacities divide by 10). Construction and survey/docking assignments likewise require the destination plus that reserve.
 
 Survey targets persist as serialized orders. Assignment uses the exact ordering in GDD 7; cancellation loses only partial scan work and takes effect immediately while scanning or after the current TravelPlan leg while in transit. Research Station projects automatically create `DockForResearch` work and remain `NoResearchShip` until the selected ship actually docks.
+
+Research reassignment is one atomic actor transaction. It validates the target first,
+releases all unconsumed old-facility reservations in place, clears old facility/ship
+ownership, preserves completed ticks, consumed credit, and rational remainders, then
+reserves only physical target stock and derives the remaining target demand. An en-route
+Research Ship finishes its current TravelPlan leg before idling. `NoResearchShip` is a
+`Paused` reason, never a separate project state. Hub Haven's authored built-in console
+remains Tier 1 after Hub upgrades; all Tier-2+ projects require a Research Station.
 
 ## Supply, Demand, and Reservations
 
@@ -222,9 +236,9 @@ The full state described in GDD 13 is serialized as JSON. Supply/demand tables, 
 - A save made while Running or Advancing loads as Paused; Won remains Won.
 - Schema migrations are one-way. Newer unsupported schemas fail with a clear error.
 - The deterministic command log records the complete command payload, command ID, effective tick, server sequence, and outcome for replay and structural idempotency comparison.
-- The next event sequence and bottleneck rolling windows are serialized; the retained event ring itself is runtime data. After process restart, an event request older than the new ring receives `ResyncRequired` and continues from a fresh snapshot.
+- The next event sequence is a positive serialized lower bound and bottleneck rolling windows are serialized. The retained event ring/allocator is server-session runtime data that survives same-process NewGame/LoadAutosave; a replacement state rebases its lower bound and emits a complete replacement delta. After process restart, the empty ring's oldest-available value and allocator are seeded from the saved lower bound, while the reported latest cursor is lower-bound minus one. A cursor one below oldest available is valid; an older request receives `ResyncRequired` and continues from a fresh snapshot.
 
-The PRNG is the project-owned xoshiro256** algorithm with four serialized `u64` state words. One call uses wrapping `u64` operations exactly as follows:
+The PRNG is the project-owned xoshiro256** algorithm with four serialized `u64` state words. As the sole exception to checked gameplay arithmetic, one call uses wrapping-modulo-2^64 `u64` operations exactly as follows:
 
 ```text
 result = rotl(s1 * 5, 7) * 9

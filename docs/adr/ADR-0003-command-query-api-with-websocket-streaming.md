@@ -21,7 +21,7 @@ We will expose versioned HTTP query/command endpoints and a WebSocket event/comm
 - `GET /api/v1/state/{collection}`
 - `GET /api/v1/state/{collection}/{id}`
 - `GET /api/v1/content`
-- `GET /api/v1/events?since_sequence=N`
+- `GET /api/v1/events?since_sequence=N&limit=L&event_type=T`
 - `POST /api/v1/command`
 - `WS /api/v1/stream`
 
@@ -39,69 +39,210 @@ We will expose versioned HTTP query/command endpoints and a WebSocket event/comm
 }
 ```
 
-- `id` is mandatory and idempotent for the server session.
-- `expected_tick` is optional optimistic concurrency. A mismatch returns 409 with current tick.
+- `id` is a mandatory nonempty UTF-8 string and idempotent for the server session.
+- `expected_tick` is required but nullable optimistic concurrency. `null` opts out;
+  an integer mismatch returns 409 with the current tick.
 - The actor assigns `server_sequence` monotonically.
 - While Running, gameplay/configuration commands are accepted for the next tick, then revalidated/applied in sequence order; their committed outcome is a later event. Lifecycle commands (`Pause`, `SaveNow`, `NewGame`, `LoadAutosave`) execute as actor transactions at the next safe commit boundary without manufacturing an extra simulation tick.
 - While Paused, planning commands apply immediately as serialized actor transactions without advancing the tick.
-- The accepted result records command ID, effective tick, and server sequence for replay.
+- Every receipt records command ID, effective boundary/tick, and server sequence; replayable commands additionally persist them in the game command log.
+
+ADR-0008 divides this exhaustive command union into replayable game commands and
+actor controls (`NewGame`, `LoadAutosave`, `SaveNow`, `Pause`, `Resume`, and
+`AdvanceTicks`). Only the replayable subset enters `GameState.command_log`; controls
+use the actor's runtime session receipt ledger and are never executed by command-log
+replay. Both subsets share the same strict envelope, structural idempotency comparison,
+and monotonic runtime receipt order, so gaps from control receipts are valid in the
+persisted replayable sequence. `SaveNow` is a FIFO committed-state barrier and is
+acknowledged only after the atomic save succeeds or fails.
 
 ### V1 Commands
 
-Lifecycle and execution:
+The shared strict envelope and complete language-neutral payload schema are:
 
-- `NewGame { scenario_id }`
-- `LoadAutosave`
-- `SaveNow`
-- `Pause`
-- `Resume`
-- `AdvanceTicks { count }` — Paused agent/test sessions only
+```text
+struct CommandEnvelope {
+  id: string              // nonempty UTF-8
+  expected_tick: u64 | null // required JSON member; null explicitly opts out
+  command: Command
+}
 
-Construction and recovery:
+enum BufferConfiguration { // internally tagged by "kind"
+  Input {
+    resource: ResourceType,       // Fuel forbidden
+    max: u32,
+    demand_threshold: u8
+  },
+  Output {
+    resource: ResourceType,       // Fuel forbidden
+    max: u32,
+    export_threshold: u8
+  },
+  Fuel {
+    demand_threshold: u8,
+    export_threshold: u8
+  }
+}
 
-- `QueueBuildShip { hub_id, role, tier }`
-- `QueueBuildStation { source_hub_id, body_id, orbit_ring, slot, station_type, tier }`
-- `QueueUpgrade { source_hub_id, station_id, target_tier }`
-- `CancelBuildOrder { order_id }`
-- `QueueDemolishStation { station_id, recovery_hub_id }`
-- `ScrapShip { ship_id }` — valid only while docked at a Hub; that Hub is the recovery destination
-- `BeginGateAssembly { fabricator_ship_id }` — validates and commits an idle Tier-4 Fabricator to the fixed Gate site
+enum Command { // internally tagged by "type"
+  NewGame { scenario_id: ScenarioId }
+  LoadAutosave
+  SaveNow
+  Pause
+  Resume
+  AdvanceTicks { count: u16 }
 
-Configuration and progression:
+  QueueBuildShip { hub_id: StationId, role: ShipRole, tier: u8 }
+  QueueBuildStation {
+    source_hub_id: StationId,
+    body_id: BodyId,
+    orbit_ring: u8,
+    slot: u8,
+    station_type: StationType,
+    tier: u8
+  }
+  QueueUpgrade {
+    source_hub_id: StationId,
+    station_id: StationId,
+    target_tier: u8
+  }
+  CancelBuildOrder { order_id: BuildOrderId }
+  QueueDemolishStation {
+    station_id: StationId,
+    recovery_hub_id: StationId
+  }
+  ScrapShip { ship_id: ShipId }
+  BeginGateAssembly { fabricator_ship_id: ShipId }
 
-- `SetStationPriority { station_id, priority }`
-- `ConfigureBuffer { station_id, direction, resource, max, threshold }`
-- `SetProductionRecipe { station_id, slot, recipe_id }`
-- `SetMiningTarget { station_id, slot, resource }`
-- `QueueResearch { facility_id, tech_id }`
-- `PauseResearch { tech_id, release_unused }`
-- `QueueSurvey { body_id, target_depth, priority }`
-- `CancelSurveyOrder { order_id }`
-
-There is no duplicate `PlaceStation` command: placement always creates a BuildOrder.
-
-### Response
-
-```json
-{
-  "id": "cmd_000123",
-  "accepted": true,
-  "effective_tick": 421,
-  "resulting_tick": null,
-  "server_sequence": 812,
-  "game_state": "Running"
+  SetStationPriority { station_id: StationId, priority: u8 }
+  ConfigureBuffer {
+    station_id: StationId,
+    configuration: BufferConfiguration
+  }
+  SetProductionRecipe {
+    station_id: StationId,
+    slot_index: u8,
+    recipe_id: RecipeId | null
+  }
+  SetMiningTarget {
+    station_id: StationId,
+    slot_index: u8,
+    resource: ResourceType
+  }
+  QueueResearch { facility_id: StationId, tech_id: TechId }
+  PauseResearch { tech_id: TechId, release_unused: bool }
+  QueueSurvey { body_id: BodyId, target_depth: u8, priority: u8 }
+  CancelSurveyOrder { order_id: SurveyOrderId }
 }
 ```
 
-`resulting_tick` is present for synchronously completed operations such as paused `AdvanceTicks`; otherwise it is null. Clients fetch a snapshot when needed; command responses do not serialize the entire `GameState` by default.
+`LoadAutosave`, `SaveNow`, `Pause`, and `Resume` serialize as objects containing
+only their `type` discriminator. Every object in the envelope, command, and nested
+buffer union rejects unknown fields. The schema bounds `AdvanceTicks.count` to
+`1..=1,000`, priorities and percentages to `0..=100`, and tiers/depths/slot indices
+to their content-validated ranges.
+
+An integer `expected_tick` is compared with the committed tick at actor dequeue. If no
+`GameState` exists, it receives the pre-acceptance 409 `ExpectedTickUnavailable` with
+`current_tick: null`; clients starting/loading from Unloaded must send null. A
+same-process NewGame/LoadAutosave from a stable game compares against the retained
+game's current tick before entering Loading.
+
+For an Input configuration, `export_threshold` remains the required serialized
+inactive value zero; for Output, `demand_threshold` remains zero. A Fuel
+configuration changes both active thresholds subject to demand less than or equal to
+export, while Fuel `resource` and `max` are immutable and therefore absent from that
+variant. General `max = 0` is valid only when current stock and every applicable
+inbound/outbound/production/research reservation are zero; it retains an explicit
+zero-capacity buffer entry rather than introducing deletion/default behavior.
+`SetProductionRecipe.recipe_id = null` clears the selected slot under GDD 12's exact
+state rule: Idle/AwaitingInputs clears directly; Processing atomically releases the
+complete reserved-input map and resets progress before clearing; OutputBlocked rejects
+until its completed batch transfers.
+
+`ReplayableGameCommand` is this exact union excluding `NewGame`, `LoadAutosave`,
+`SaveNow`, `Pause`, `Resume`, and `AdvanceTicks`. ADR-0008 owns the persistence and
+receipt consequences of that split. There is no duplicate `PlaceStation` command:
+placement always creates a BuildOrder.
+
+### Response
+
+Accepted envelopes return this exact acknowledgement shape (`accepted` is the
+literal `true`):
+
+```text
+struct CommandAcknowledgement {
+  protocol_version: string
+  id: string
+  accepted: true
+  status: Accepted | Applied | Rejected | Failed
+  effective_tick: u64 | null
+  resulting_tick: u64 | null
+  server_sequence: u64
+  game_state: GameLifecycle
+  result: CommandResult | null
+  error: CommandRejection | null
+}
+```
+
+```json
+{
+  "protocol_version": "v1",
+  "id": "cmd_000123",
+  "accepted": true,
+  "status": "Accepted",
+  "effective_tick": 421,
+  "resulting_tick": null,
+  "server_sequence": 812,
+  "game_state": "Running",
+  "result": null,
+  "error": null
+}
+```
+
+`202` carries `Accepted` for a command queued at a future running tick. `200`
+carries `Applied` for a command committed during the request. If an accepted
+command reaches a domain rejection during the request, `409` or `422` carries a
+`Rejected` acknowledgement according to the error class; an accepted control
+whose infrastructure operation fails returns `500` with `Failed`. A command
+rejected before actor acceptance instead returns the ordinary typed API error
+from TDD 02 and no acknowledgement or committed outcome event. The runtime
+ledger still records that pre-acceptance rejection so an exact retry cannot evade
+`expected_tick`, lifecycle, or idempotency validation.
+
+`result` is non-null only for `Applied`, including the explicit tagged
+`{"type":"None"}` result. `error` is non-null only for `Rejected` or `Failed`.
+`resulting_tick` is derived only from
+`{"type":"AdvanceTicksCompleted","resulting_tick":N}` and otherwise is null.
+`effective_tick` may be null only for an accepted state-replacement control begun
+while Unloaded; replayable commands always carry an integer. `game_state` is the
+actor's current lifecycle when the response is serialized and is advisory rather
+than part of the persisted command result. Clients fetch a snapshot when needed;
+responses never serialize the complete `GameState`.
+
+An identical retry returns the receipt's current recorded status and exact stored
+result or error without starting work or emitting another event. Thus a prior
+`202 Accepted` may become `200 Applied` on a later retry. A changed envelope with
+the same ID always returns `409 IdempotencyConflict`.
 
 ### Events and Resynchronization
 
-Every event has `event_sequence`, committed `tick`, and a tagged payload. Event kinds include lifecycle changes, command results, state deltas, builds, research, arrivals, survey completion, bottlenecks, salvage, and Gate completion.
+Every event has a session-monotonic `event_sequence`, nullable committed `tick`, and a tagged payload. `tick` is null only for accepted control/runtime outcomes while Unloaded. Event kinds include lifecycle changes, command results, state deltas, builds, research, arrivals, survey completion, bottlenecks, salvage, and Gate completion.
 
-The server retains the newest 50,000 events; tick coverage is workload-dependent. If `since_sequence` predates retention, HTTP returns 410 `ResyncRequired`; WS sends the same signal. The client then fetches `GET /state` and resumes from the snapshot's latest event sequence.
+The server retains the newest 50,000 session events; its runtime ring/counter survives
+same-process NewGame/LoadAutosave. A loaded state provides only a persisted lower
+bound, which is rebased before a complete-replacement StateDelta. Fresh-process load
+seeds the empty ring's next sequence and oldest-available boundary. ADR-0012's exact
+rule permits `since_sequence = oldest_available - 1`, returns 410 only for an older
+cursor, and rejects a cursor beyond the runtime latest value with 400. The client then
+fetches `GET /state` and resumes from the snapshot's runtime latest event sequence.
 
-A slow WebSocket client never changes tick rate. Its bounded queue may coalesce position deltas or terminate with `ResyncRequired`; durable gameplay events remain available through retained history until the retention boundary.
+A slow WebSocket client never changes tick rate. Its bounded queue may coalesce only
+the named cumulative progress events in ADR-0012; `StateDelta`, command outcomes,
+entity changes, and other durable events are never coalesced or dropped. If required
+continuity cannot be queued, the server sends `ResyncRequired` when possible and
+terminates the stream. Canonical retained history remains complete until its bounded
+retention boundary.
 
 ### Local Security
 

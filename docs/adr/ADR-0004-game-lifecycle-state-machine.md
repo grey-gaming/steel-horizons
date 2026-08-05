@@ -38,7 +38,14 @@ Paused/Running/Won --NewGame/LoadAutosave--> Loading
 
 `AdvanceTicks` is unavailable while Running and is intended for agent/test clients. Batch errors return to Paused at the last fully committed tick.
 
-Loading is atomic. When `NewGame`/`LoadAutosave` begins from Paused, Running, or Won, the actor retains the prior immutable state. Validation/deserialization failure restores that exact state and lifecycle; only a load begun from Unloaded fails back to Unloaded. A successful load/new game replaces state and enters the loaded lifecycle (normally Paused; a Won autosave remains Won).
+Loading is atomic. When `NewGame`/`LoadAutosave` begins from Paused, Running, or Won, the actor retains the prior immutable state. Validation/deserialization failure restores the exact gameplay state and lifecycle; only a load begun from Unloaded fails back to Unloaded. The committed session receipt and monotonic command/event allocator bookkeeping are not rolled back. A successful load/new game replaces state, rebases its event lower bound under ADR-0012, emits a complete replacement delta, and enters the loaded lifecycle (normally Paused; a Won autosave remains Won).
+
+The actor owns one runtime lifecycle independently of `Option<GameState>`. In a stable
+game state (Paused/Running/Advancing/Won), runtime lifecycle and the serialized
+`GameState.lifecycle` are equal. Unloaded has no `GameState`. During Loading, the actor
+keeps any prior `GameState` privately and unmodified for rollback, publishes no game
+snapshot, and exposes runtime `Loading` plus a typed loading operation/stage through
+status. `Loading` is never written into that retained state merely to report progress.
 
 ### Save Normalization
 
@@ -48,7 +55,11 @@ Saves made from Running or Advancing serialize a load lifecycle of Paused. A Won
 
 Every transition occurs in the single simulation actor. Concurrent requests receive server-sequence numbers and cannot create two batch advances, mutate state during Loading/Advancing, or race Pause against a partial tick.
 
-Invalid lifecycle commands return 409 with current state and the allowed-state set. Queries against Unloaded return 503; Loading returns 202 status with progress and 503 for game-state queries.
+Invalid lifecycle commands return 409 with current state and the allowed-state set.
+`GET /status`, `GET /content`, and event polling/streaming remain available while
+Unloaded or Loading. Status returns 200 and the exact runtime lifecycle/loading stage;
+game-state and collection queries return 503 in both states. Other query endpoints
+retain their TDD 02 behavior.
 
 ### API Server Lifecycle
 

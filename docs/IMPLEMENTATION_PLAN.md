@@ -45,9 +45,9 @@ Changing an authoritative rule requires updating every affected summary, schema/
 - Add recovery behavior with the mechanic that creates the recoverable state: build cancellation with building, recipe release with production, research pause with research, and survey cancellation with surveying.
 - Establish canonical serialization, hashing, save/load, and replay before rich gameplay state so every later state field inherits those gates.
 - Use canonical content in scenarios. Specialized fixtures may vary setup but must not redefine balance.
-- Once a required test or scenario is activated, it remains part of every subsequent cumulative gate.
+- Once a commit-class test or scenario is activated, it remains part of every subsequent commit gate. Qualification-class play-test/platform gates follow the explicit matrix cadence.
 - Correctness and deterministic equivalence precede optimization.
-- Simulation state uses checked integers, stable iteration, and the project-owned serialized PRNG; overflow is a typed error rather than wrapping or panicking.
+- Simulation state uses checked gameplay/domain integers, stable iteration, and the project-owned serialized PRNG; overflow is a typed error rather than wrapping or panicking, except for GDD 12's named PRNG operations that intentionally wrap modulo 2^64.
 - In the running application, the simulation actor is the sole mutable state owner; the fixed GDD 12 phase order and outcomes are independent of execution speed.
 - Generated IDs come only from serialized per-kind counters; UUIDs, wall-clock values, and collection lengths never determine simulation identity.
 
@@ -113,7 +113,7 @@ Before implementing an increment, read its row here and the more-specific cross-
 |---|---|
 | G0-01–G0-09 | [README — Authority and Change Rules](../README.md#authority-and-change-rules), [GDD 12](gdd/12-simulation-foundations.md), [GDD 13](gdd/13-data-models.md), [GDD 14](gdd/14-authored-content.md), [ADR-0005](adr/ADR-0005-test-architecture.md), and the specific overlapping documents named by the gap |
 | P1-01 | [TDD 04 — Testing Strategy](tdd/04-testing-strategy.md), [TDD 05 — Build & Deployment](tdd/05-build-and-deployment.md) |
-| P1-02–P1-05 | [GDD 13 — Identifiers, Root State, and Content Definitions](gdd/13-data-models.md), [GDD 14 — Authored Content](gdd/14-authored-content.md), [ADR-0005 — Content Validation Gate](adr/ADR-0005-test-architecture.md#content-validation-gate) |
+| P1-02a–P1-05 | [GDD 13 — Identifiers, Root State, and Content Definitions](gdd/13-data-models.md), [GDD 14 — Authored Content](gdd/14-authored-content.md), [ADR-0005 — Content Validation Gate](adr/ADR-0005-test-architecture.md#content-validation-gate) |
 | P1-06–P1-10 | [ADR-0002 — Deterministic Tick Simulation](adr/ADR-0002-deterministic-tick-simulation.md), [GDD 12 — Numeric Representation, Tick Order, and Replay](gdd/12-simulation-foundations.md), [TDD 01 — Simulation Engine](tdd/01-simulation-engine.md) |
 | P1-11–P1-14 | [ADR-0003 — Command/Query API](adr/ADR-0003-command-query-api-with-websocket-streaming.md), [ADR-0004 — Lifecycle](adr/ADR-0004-game-lifecycle-state-machine.md), [TDD 00 — Architecture](tdd/00-architecture.md), [TDD 02 — API Protocol](tdd/02-api-protocol.md) |
 | P1-15–P1-19 | [GDD 3 — Economy](gdd/03-economy.md), [GDD 5 — Ships, Stations & Factories](gdd/05-ships-stations-factories.md), [GDD 6 — Onboarding Phase 1](gdd/06-onboarding.md#phase-1--first-production-chain-hour-01), [GDD 7 — Routes & Logistics](gdd/07-routes-and-logistics.md), [GDD 12 — Production and Logistics](gdd/12-simulation-foundations.md), [GDD 14 — Starting State and Recipes](gdd/14-authored-content.md) |
@@ -132,15 +132,15 @@ Before implementing an increment, read its row here and the more-specific cross-
 
 Although the Phase 1 architecture is approved, the following deterministic contracts must be made explicit before their dependent production increments. Resolve each as a small doc-only change using the authority hierarchy, then add its planned executable proof. Do not bury these decisions inside code.
 
-- [x] **G0-01 — Complete machine-readable content schemas.** Define `ShipStats`, `StationStats`, the starting-scenario record, Gate definition, authored defaults, and schema-generation ownership. Required before P1-02/P1-03.
+- [x] **G0-01 — Complete machine-readable content schemas.** Define `ShipStats`, `StationStats`, the starting-scenario record, Gate definition, authored defaults, and schema-generation ownership. Required before P1-02a/P1-02b/P1-03.
 - [x] **G0-02 — Define canonical content/state hashing.** Specify included/excluded fields, canonical byte encoding, map/set ordering, hash function/version, and golden-update policy. Required before P1-05/P1-08.
 - [x] **G0-03 — Define the save envelope.** Place the normalized content hash outside or inside the authoritative root state explicitly, and specify schema/content compatibility and migration fixtures. Required before P1-13.
 - [x] **G0-04 — Define accepted-command persistence.** Specify what `SaveNow` does with commands accepted for future ticks, pending actor-mailbox state, command outcomes, and idempotency records across save/load and process restart. Required before P1-13.
 - [x] **G0-05 — Define Hub shipyard queue semantics.** Specify capacity, ordering, active work representation, cancellation, and serialized fields. Required before P1-15.
 - [x] **G0-06 — Define mining boundary behavior.** Specify full-output handling, finite-deposit exhaustion when production exceeds the remainder, and the extraction/belt-drift order at tick multiples of 1,000. Required before P1-17/P1-26.
 - [x] **G0-07 — Define deterministic refueling.** Specify eligible ship roles, Fuel-station selection and tie-breaks, route feasibility, transfer quantity/timing, partial stock behavior, and dock usage. Required before P1-20/P1-21.
-|- [x] **G0-08 — Complete command/event wire contracts.** Define exhaustive tagged payloads, `StateDelta` replacement/removal semantics, durable versus coalescible events, and research resume/reassignment across facilities. Required before P1-22/P1-31.
-|- [x] **G0-09 — Reconcile cumulative CI policy with ADR-0005/TDD 04.** Amend the authoritative testing documents so that, during greenfield construction, every commit runs all gates activated so far; each final required scenario becomes permanently mandatory at its owning increment; all gates are mandatory at Phase 1 completion. Required before P1-01.
+- [x] **G0-08 — Complete command/event wire contracts.** Define exhaustive tagged payloads, `StateDelta` replacement/removal semantics, durable versus coalescible events, and research resume/reassignment across facilities. Required before P1-22/P1-31.
+- [x] **G0-09 — Reconcile cumulative CI policy with ADR-0005/TDD 04.** Amend the authoritative testing documents so that, during greenfield construction, every commit runs all gates activated so far; each final required deterministic scenario becomes permanently mandatory at its owning increment; long-running agent play-tests run at P1-35 completion and thereafter in nightly/pre-release/completion gates; all gates are mandatory at Phase 1 completion. Required before P1-01.
   - Verify: focused text/link consistency review proves ADR-0005, TDD 04, this plan, and root `AGENTS.md` state the same policy; P1-01 later automates protocol/policy synchronization.
 
 Gate 0 evidence is recorded like implementation evidence. If an item materially changes approved product behavior and cannot be resolved by the authority hierarchy, it is an explicit blocker requiring owner direction.
@@ -148,19 +148,24 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
 ## Phase 1 — Foundation and executable contracts
 
 - [ ] **P1-01 — Repository, toolchain, CI, and traceability scaffold.**
-  - Deliver: pinned Rust and Python toolchains; Cargo workspace; engine library/binary shell; Python package shell; dependency locks; formatting, lint, unit-test, and baseline macOS/Windows CI entry points; requirement-to-test ledger; marker-based check that the duplicated per-turn protocol is byte-identical in both documents.
-  - Verify: clean locked build, one Rust test, one Python test, formatter/linter gates, protocol-sync check, and `steel-horizons-engine --version`.
+  - Deliver: pinned Rust and Python toolchains; Cargo workspace; engine library/binary shell; Python package shell; dependency locks; formatting, lint, unit-test, and macOS CI entry points; platform-neutral verification scripts for later Windows activation; requirement-to-test ledger; reproducible schema-export command shell; marker-based checks for the duplicated per-turn protocol and staged verification-policy manifest.
+  - Verify: clean locked build, one Rust test, one Python scaffold test, formatter/linter gates, protocol/policy-sync checks, and `steel-horizons-engine --version`.
   - Depends on: G0-09.
 
-- [ ] **P1-02 — Protocol/domain vocabulary.**
-  - Deliver: ID newtypes, `ResourceType`, lanes, lifecycle, entity-role/state enums, explicit Serde tags, `BTreeMap`/`BTreeSet` serialization, and command unknown-field rejection.
+- [ ] **P1-02a — Primitive protocol/domain vocabulary.**
+  - Deliver: ID newtypes, `ResourceType`, lanes, lifecycle, entity-role/state enums, explicit Serde tags, and deterministic `Ord` implementations.
   - Verify: serialization snapshots, enum/newtype round trips, stable resource order, invalid/unknown-field cases.
   - Depends on: G0-01, P1-01.
 
+- [ ] **P1-02b — Serialized state/content contracts and schema exporter.**
+  - Deliver: every GDD 13 Serde-only DTO including `GameState`, `DefinitionsCatalog`, `StartingScenario`, commands, strict unknown-field policy, `BTreeMap`/`BTreeSet` shapes, and deterministic content JSON Schema export.
+  - Verify: full DTO round trips; explicit null/empty collection fixtures; root-schema snapshots; duplicate/unknown/missing-field rejection; regeneration has no diff.
+  - Depends on: G0-04–G0-08, P1-02a.
+
 - [ ] **P1-03 — Canonical content files.**
-  - Deliver: `content/definitions.v1.json` and `content/starting_system.v1.json` transcribed from GDD 14.
-  - Verify: exact record/count/value fixtures covering 25 resource types, seven bodies, 19 slots, starting metadata/inventory, recipes, technologies, ship/station tiers, and Gate values.
-  - Depends on: P1-02.
+  - Deliver: `content/definitions.v1.json`, `content/starting_system.v1.json`, and the two reproducibly generated `schemas/content/*.schema.json` artifacts transcribed from GDD 14/GDD 13.
+  - Verify: schema regeneration has no diff; exact record/count/value fixtures cover 25 resource types, seven bodies, 19 slots, 27 recipes (11 refining, eight assembly, eight inverse), 23 technologies, 12 ship definitions, 20 station definitions, starting metadata/inventory/explicit fields, typed mechanic unlocks, build-work/default constants, and Gate values.
+  - Depends on: P1-02b.
 
 - [ ] **P1-04 — Content validator: structural rules.**
   - Deliver: schema parsing, precise errors, unique IDs, authored/generated namespace separation, parent/body/slot validity, thresholds, statistics, starting capacities, and exact slot total.
@@ -175,7 +180,7 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
 - [ ] **P1-06 — Exact arithmetic kernel.**
   - Deliver: standard milli accumulator, denominator-specific rational accumulator, Fuel and Life Support accumulators, scale newtypes, and checked arithmetic errors.
   - Verify: canonical examples, quotient greater than one, exact project completion, remainder bounds, overflow/property tests.
-  - Depends on: P1-02.
+  - Depends on: P1-02a.
 
 - [ ] **P1-07 — Deterministic PRNG and travel geometry.**
   - Deliver: project-owned xoshiro256**, stable iteration helpers, radial/arc route construction, lane/payload speed calculation, zero-distance and wrap behavior.
@@ -183,9 +188,9 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
   - Depends on: P1-06.
 
 - [ ] **P1-08 — Root state and canonical starting state.**
-  - Deliver: all GDD 13 serialized shapes, canonical tick-zero loader, generated counters/names, cheap invariant checker, canonical state projection and hash.
-  - Verify: exact tick-zero snapshot/hash, Serde round trip, malformed-state negatives, insertion-order independence.
-  - Depends on: G0-02, P1-03, P1-06, P1-07.
+  - Deliver: canonical tick-zero constructor from the explicit scenario mapping, generated counters/names, cheap invariant checker, canonical state projection and hash over the P1-02b DTOs.
+  - Verify: exact tick-zero snapshot/hash, complete Hub/Builder fields, Serde round trip, malformed-state negatives, insertion-order independence, exact generated prefixes/next-unused formatting, checked overflow, rollback non-consumption, committed non-reuse, and save/replay counter continuity.
+  - Depends on: G0-02, P1-02b, P1-03, P1-06, P1-07.
 
 - [ ] **P1-09 — Tick transaction skeleton.**
   - Deliver: pending field changes, explicit reducers, conflict rejection, all eleven fixed phase hooks, immutable tick facts, atomic commit/rollback, committed event hook.
@@ -194,7 +199,7 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
 
 - [ ] **P1-10 — Deterministic scenario harness.**
   - Deliver: canonical content loader, explicit `command_at`, `advance_until`, state/event assertions, invariant and hash helpers; no wall-clock waits.
-  - Verify: repeated calls to the ordinary tick function and harness batch advancement of the same N ticks produce identical hashes and events.
+  - Verify: repeated calls to the ordinary tick function and harness batch advancement of the same N ticks produce identical ADR-0006 replay-equivalence hashes and canonical deterministic event traces.
   - Depends on: P1-09.
 
 - [ ] **P1-11 — Actor and lifecycle.**
@@ -203,25 +208,25 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
   - Depends on: P1-09, P1-10.
 
 - [ ] **P1-12 — Command sequencing and idempotency.**
-  - Deliver: command envelope, server/effective sequence, paused immediate versus running queued behavior, `expected_tick`, structural idempotency, command records, typed errors.
-  - Verify: concurrent stable ordering; same ID/same payload; same ID/different payload; lifecycle conflicts; transaction rollback.
+  - Deliver: strict command envelope, replayable-versus-control classification, server/effective sequence, paused immediate versus running queued behavior, `expected_tick`, full-envelope structural idempotency, exact typed command results, command records, state-replacement receipt merging, and typed errors.
+  - Verify: concurrent stable ordering; same ID/same full envelope; same ID with changed command/`expected_tick`; exact generated-ID result survives later entity removal and identical retry; replayable/control lifecycle conflicts; NewGame/Load receipt retention and collision behavior; transaction rollback.
   - Depends on: P1-11.
 
 - [ ] **P1-13 — Persistence and replay skeleton.**
-  - Deliver: normalized save envelope, atomic temp/write/sync/rename, schema/content checks, load rollback, command-log replay, rebuild rules.
-  - Verify: uninterrupted, save-split, and replayed walking-skeleton runs have identical hashes and sequences; failure leaves prior save/state intact.
+  - Deliver: normalized save envelope with exact `content_hash`, versioned hash scheme, linearizable actor save barrier, single FIFO save/load target worker, platform-specific atomic replacement, schema migrations, load rollback, command-log replay, pending/idempotency rebuild rules, and control-command save acknowledgements.
+  - Verify: uninterrupted, save-split (including pending commands), and replayed walking-skeleton runs have identical replay-equivalence hashes and canonical deterministic event traces; applied results and generated IDs survive save/load and are returned on identical resubmission even after entity removal; save-integrity hashes validate exact stored bytes; malformed envelope/hash/content/migration cases fail typed; injected write/replace and SaveNow failures leave the prior save/state intact and return the correct idempotent outcome; delayed A/B saves, success/failure permutations, SaveNow→LoadAutosave, autosave, and shutdown prove target ordering.
   - Depends on: G0-03, G0-04, P1-12.
 
 - [ ] **P1-14 — Authenticated REST walking skeleton and generated client.**
   - Deliver: engine CLI basics; loopback preferred/fallback ports; random token; owner-only discovery; status/state/content/command endpoints; error envelope and request limits; deterministic OpenAPI/JSON Schema export; minimal generated Python client.
-  - Verify: spawned real-process discovery/auth/status/state plus Paused `AdvanceTicks`; missing/bad credentials and permissions.
+  - Verify: spawned real-process discovery/auth/status/state plus Paused `AdvanceTicks`; exact Accepted/Applied/Rejected/Failed acknowledgement and pre-acceptance error schemas/status codes; result/resulting-tick derivation; missing/bad credentials and permissions.
   - Depends on: P1-13.
 
 ## Phase 1 — Canonical gameplay vertical slices
 
 - [ ] **P1-15 — Local BuildOrder staging and Hub shipyard.**
-  - Deliver: locally allocate unreserved deployment-kit components into staging, one active shipyard work item, ship completion, cancellation, component return/overflow salvage.
-  - Verify: build and cancel a Courier with exact component conservation and save/replay equivalence.
+  - Deliver: one active FIFO shipyard order; pending orders with no staging/demand; promotion-time local allocation; remote reservation handling; zero-Fuel ship completion; cancellation/loaded-delivery recovery; component return/overflow salvage.
+  - Verify: build, promote, and cancel a Courier at every queue/material state; no pending-order demand; build→scrap whole-economy conservation; exact component/Fuel conservation and save/replay equivalence.
   - Depends on: G0-05, P1-14.
 
 - [ ] **P1-16 — Station construction.**
@@ -230,8 +235,8 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
   - Depends on: P1-15.
 
 - [ ] **P1-17 — Buffers and mining.**
-  - Deliver: priority/buffer commands, atomic preferred/minimum allocation, thresholds, mining target validation, ten-tick retune, finite extraction.
-  - Verify: exact ten-tick traces, buffer/capacity bounds, finite-deposit conservation, full-output/exhaustion behavior.
+  - Deliver: priority/buffer commands, atomic preferred/minimum allocation, thresholds, serialized mining slots, exact ten-resulting-tick retune, capacity-safe finite extraction, and shared-deposit reducer.
+  - Verify: exact retarget/re-retarget traces; buffer/capacity bounds; two-station shared-deposit conservation/order; partial-space, full-output, exact/excess exhaustion; save/replay at retune and extraction boundaries.
   - Depends on: G0-06, P1-16.
 
 - [ ] **P1-18 — Production and slow Hub assembly.**
@@ -245,13 +250,13 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
   - Depends on: P1-18.
 
 - [ ] **P1-20 — Inter-body movement and actual-distance Fuel.**
-  - Deliver: TravelPlan execution, segment-boundary positions, payload speed, actual-distance tick facts, Fuel debit, arrival/dock holding, next-tick inventory visibility.
-  - Verify: multi-body delivery; radial/arc/final-cap cases; empty base mass; arrival isolation; save/replay equivalence.
+  - Deliver: TravelPlan execution, segment-boundary positions, payload speed, actual-distance/arrival tick facts, phase-8 Fuel debit, arrival/dock holding, next-tick inventory visibility, and checked route-feasibility simulation over cloned Fuel remainders.
+  - Verify: multi-body delivery; radial/arc/final-cap and Life Support cases; empty base mass; arrival/debit isolation; save/replay equivalence.
   - Depends on: G0-07, P1-19.
 
 - [ ] **P1-21 — Fuel feasibility, refueling, reservation contention, and rescue.**
-  - Deliver: deterministic fuel-feasible cargo binary search, low-Fuel work, refuel job, AwaitingPickup expiry, Holding order, rescue delay/tow/arrival.
-  - Verify: `reservation_contention`, `fuel_rescue_recovery`, no double reservation/overfill, loaded jobs never expire or rescue.
+  - Deliver: deterministic fuel-feasible cargo binary search, below-full refuel trigger, unreserved direct-refuel allocation distinct from the Cargo export floor, shared phase-8 Fuel reducer/result fact, phase-9 fact-budget consumption, stable dock/Fuel contention, AwaitingPickup expiry, Holding order, and docked-wait versus conservation-safe rescue delay/tow/arrival.
+  - Verify: `reservation_contention`, `fuel_rescue_recovery`, exact threshold/remainder/Life Support routes, same-tick partial-stock contention, production/research/Cargo hold priority, post-phase-8 assignment/route inputs, zero-Fuel newly built ship, rescue Fuel/remainder preservation, no double reservation/overfill, and loaded jobs never expire or rescue.
   - Depends on: P1-20.
 
 - [ ] **P1-22 — Hub research.**
@@ -280,8 +285,10 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
   - Depends on: G0-06, P1-25.
 
 - [ ] **P1-27 — Bottleneck monitoring.**
-  - Deliver: 600-tick delivery buckets, rolling total, 300-tick warning/clear state, typed events, serialized windows.
-  - Verify: uninterrupted and split-save runs emit/clear at the same tick and event sequence.
+  - Deliver: 600-tick delivery buckets, rolling total, serialized consecutive-deficit/clear counters, 300-tick warning/clear state, and typed events.
+  - Verify: uninterrupted and split-save runs emit/clear at the same gameplay tick
+    and match under ADR-0006 replay-equivalence bytes and canonical deterministic
+    event traces; session event-sequence continuity is checked separately.
   - Depends on: P1-26.
 
 - [ ] **P1-28 — Ship scrapping and salvage.**
@@ -302,13 +309,13 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
 ## Phase 1 — Protocol, client, and release qualification
 
 - [ ] **P1-31 — Complete event and polling surface.**
-  - Deliver: exhaustive external event types/deltas from committed transactions, 50,000-event ring, pagination, filtering, retention-boundary resynchronization.
-  - Verify: monotonic sequences, integer-only deltas, exact 410 details, durable versus coalescible event behavior, schema snapshots.
+  - Deliver: generated-schema-exhaustive external event union, a session-owned monotonic allocator/ring valid while Unloaded, full entity/root replacement and removal deltas from committed transactions/state replacement, 50,000-event retention, pagination, filtering, and resynchronization.
+  - Verify: every event variant/payload including null-tick control failure; integer-only replacement/deletion cache reducer; same-session NewGame/Load rebase, old/new key-set entity events, and complete replacement; fresh-process next/latest/oldest cursor math; oldest-minus-one resume, older 410, and future-cursor 400 boundaries; monotonic order; progress-only coalescence or forced resync; exact error details; eviction; schema snapshots.
   - Depends on: G0-08, P1-30.
 
 - [ ] **P1-32 — WebSocket parity and backpressure.**
   - Deliver: Hello/Subscribe/Command, CLI authorization header, browser subprotocol token and Origin allowlist, per-client queue 2,048, coalescing/resync/4009 close.
-  - Verify: shared REST/WS corpus has equal acknowledgements/state hashes; lagged clients never alter tick timing; reconnection at/behind retention.
+  - Verify: shared REST/WS corpus has equal acknowledgements/replay-equivalence hashes; lagged clients never alter tick timing; reconnection at/behind retention.
   - Depends on: P1-31.
 
 - [ ] **P1-33 — Runtime and API hardening.**
@@ -346,40 +353,49 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
   - Verify: complete Phase 1 gate from a clean checkout; at least 100 batch ticks/sec at 500 ships, 200 stations, and all 25 resources on the recorded reference runners.
   - Depends on: P1-35.
 
-## Scenario activation matrix
+## Gate activation matrix
 
-Once activated, a scenario remains required in every later cumulative gate.
+Commit gates remain required after activation. Qualification gates run for their owning
+increment's completion and thereafter in nightly, pre-release, and Phase 1 completion
+runs; they are not added to every ordinary commit merely because they are long-running
+or platform-bound.
 
-| Owning increment | Newly mandatory scenario/gate |
-|---|---|
-| P1-05 | Structural and semantic content validation; normalized content hash |
-| P1-10 | Ordinary-tick versus harness-batch equivalence proof |
-| P1-11 | Required `realtime_batch_equivalence` through scheduler and `AdvanceTicks` paths |
-| P1-13 | `save_load_equivalence` and `command_log_replay_equivalence`, extended by every later state change |
-| P1-19 | `bootstrap_to_first_cargo`; executable bootstrap content validation |
-| P1-21 | `reservation_contention`; `fuel_rescue_recovery` |
-| P1-25 | `full_supply_chain` |
-| P1-26 | `first_five_hours`; `belt_drift_determinism`; `all_techs_reachable` |
-| P1-29 | `cancel_demolish_rebuild_recovery` |
-| P1-30 | `starting_state_to_gate_victory` |
-| P1-32 | Complete shared REST/WebSocket transport corpus |
-| P1-35 | Minimal Gate, full-economy, poor-build recovery, and ceiling agent play-tests |
-| P1-36 | Supported-platform state hashes and release benchmark |
+| Owning increment | Class | Newly mandatory scenario/gate |
+|---|---|---|
+| P1-05 | Commit | Structural and semantic content validation; normalized content hash |
+| P1-10 | Commit | Ordinary-tick versus harness-batch equivalence proof |
+| P1-11 | Commit | Required `realtime_batch_equivalence` through scheduler and `AdvanceTicks` paths |
+| P1-13 | Commit | `save_load_equivalence` and `command_log_replay_equivalence`, extended by every later state change |
+| P1-14 | Commit | Authenticated REST walking-skeleton conformance and generated-client smoke |
+| P1-19 | Commit | `bootstrap_to_first_cargo`; executable bootstrap content validation |
+| P1-21 | Commit | `reservation_contention`; `fuel_rescue_recovery` |
+| P1-25 | Commit | `full_supply_chain` |
+| P1-26 | Commit | `first_five_hours`; `belt_drift_determinism`; `all_techs_reachable` |
+| P1-29 | Commit | `cancel_demolish_rebuild_recovery` |
+| P1-30 | Commit | `starting_state_to_gate_victory` |
+| P1-31 | Commit | Complete event polling, retention, schema, and resynchronization corpus |
+| P1-32 | Commit | Complete shared REST/WebSocket transport and backpressure corpus |
+| P1-34a–P1-34d | Commit | Cumulative generated Python client/TUI gates delivered by each sub-increment |
+| P1-35 | Qualification | Minimal Gate, full-economy, poor-build recovery, and ceiling agent play-tests |
+| P1-36 | Commit | Windows locked build and test CI |
+| P1-36 | Qualification | Supported-platform state hashes, release benchmark, private artifacts, and SBOM |
 
 ## Phase 1 completion gate
 
 Phase 1 is complete only when a clean checkout passes, in order:
 
-1. Rust formatting and Clippy with warnings denied.
-2. Full schema/content validation, including exact bootstrap and critical-resource budget.
-3. Unit and property tests for arithmetic, invariants, conservation, ordering, recovery, and overflow.
-4. All twelve deterministic scenarios.
-5. Complete HTTP/WebSocket API conformance and security/backpressure tests.
-6. Save/load, batch/real-time, and command-log replay equivalence over the completed game.
-7. Python formatting, typing, unit/integration tests, all renderer modes, and agent play-tests.
-8. Supported-platform canonical state hashes.
-9. V1-ceiling release benchmark.
-10. Locked private artifacts and SBOM.
+1. Repository policy/protocol synchronization and reproducible generated-file checks.
+2. Rust formatting, locked workspace build, and Clippy with warnings denied.
+3. Full schema/content validation, including exact bootstrap and critical-resource budget.
+4. Unit and property tests for arithmetic, invariants, conservation, ordering, recovery, and overflow.
+5. Every deterministic scenario and equivalence proof activated above.
+6. Complete HTTP/WebSocket API conformance and security/backpressure tests.
+7. Save/load, batch/real-time, and command-log replay equivalence over the completed game.
+8. Python formatting, typing, unit/integration tests, all renderer modes, and agent play-tests.
+9. Windows locked build and test through the supported Windows CI entry point.
+10. Supported-platform canonical state hashes.
+11. V1-ceiling release benchmark.
+12. Locked private artifacts and SBOM.
 
 No skipped required test, flaky retry, unexplained golden/hash update, or unsupported authoritative rule is compatible with this gate.
 
@@ -451,110 +467,119 @@ Golden/hash changes: <none, or exact reviewed reason>
 Notes: <remaining non-blocking follow-up, if any>
 ```
 
+Gate 0 was independently re-audited on 2026-08-04 after its initial closure.
+The entries below retain each original closure commit for traceability; all
+corrections named in the notes belong to the enclosing Gate 0 audit change. No
+production harness exists before P1-01, so Gate 0 uses document proofs and names
+the exact future executable owners. The common audit runs `git diff --check`, a
+read-only local Markdown link/anchor/frontmatter/fence check, a byte comparison
+of the duplicated per-turn protocol, ADR-index coverage, and targeted stale-rule
+searches. All passed before this log was finalized.
+
 ```text
 Increment: G0-01
 Date: 2026-08-04
-Commit: 317e05a
-Requirements: GDD 13 §Content Definitions, GDD 13 §Schema Generation Ownership, GDD 14 §Canonical Ship Definitions, GDD 14 §Canonical Station Definitions, GDD 14 §Space Gate Definition, GDD 14 §Automatic Buffer Defaults
-Focused proof: Document consistency check — every new struct field maps to an existing GDD 14 table column or authored value. Future executable proof: P1-02 deserializes ShipStats/StationStats/StartingScenario from content JSON; P1-04/P1-05 validates schema conformance against these shapes; P1-01 schema generator emits JSON Schema from canonical Rust types.
-Cumulative gates: Document consistency verification (see G0-01 evidence in session transcript)
+Commit: 317e05a (original closure; evidence follow-up f1f3872)
+Requirements: GDD 13 §Content Definitions and §Schema Generation Ownership; GDD 14 §Starting State, §Canonical Ship Definitions, §Canonical Station Definitions, §Space Gate Definition, and §Automatic Buffer Defaults
+Focused proof: Content-contract cross-check. Future executable proof: P1-02b round-trips the complete strict DTO roots and schema exporter; P1-03 regeneration is diff-free and exact fixtures cover every authored value; P1-04/P1-05 validate both roots.
+Cumulative gates: Common Gate 0 document audit — passed.
 Scenarios activated: none (doc-only Gate 0)
-Golden/hash changes: none (no executable golden files affected)
-Notes: G0-01 is a specification-closure Gate 0 increment. No behavioral tests exist yet. The structs defined here are the canonical shapes for content JSON in P1-01/P1-02. Schema generation ownership is assigned to Tech Lead and the engine build process.
+Golden/hash changes: none
+Notes: Audit repair closes the malformed code fence, distinguishes authored data roots from generated schemas, defines complete DefinitionsCatalog/StartingScenario construction without hidden inventory injection, and assigns exporter implementation to P1-02b and generated artifacts to P1-03.
 ```
 
 ```text
 Increment: G0-02
 Date: 2026-08-04
-Commit: (pending — no production code changed)
-Requirements: ADR-0006 — Canonical Content/State Hashing; GDD 13 §Root State; GDD 12 §Save, Load, and Replay; ADR-0005 §Content Validation Gate, §CI Policy
-Focused proof: Document consistency check — every hash policy in ADR-0006 references existing GDD 13 serialized shapes, GDD 14 authored content, GDD 12 persistence rules, and ADR-0005 CI/golden policy. No contradiction with any existing ADR. Future executable proof: P1-05 validates content hash against golden; P1-08 locks tick-zero state hash against golden.
-Cumulative gates: Document consistency verification (cross-reference check against GDD 12, GDD 13, GDD 14, ADR-0001, ADR-0002, ADR-0005, TDD 00, TDD 01)
+Commit: e199942 (original closure)
+Requirements: ADR-0006 §§1–9; GDD 12 §Save, Load, and Replay; GDD 13 §Lifecycle, RNG, Commands, and Root State and §Content Definitions
+Focused proof: Hash-contract cross-check. Future executable proof: P1-05 locks normalized content bytes/hash; P1-08 locks scenario/replay-equivalence/save-integrity projections; P1-13 verifies save integrity; P1-36 compares canonical bytes and hashes on supported runners.
+Cumulative gates: Common Gate 0 document audit — passed.
 Scenarios activated: none (doc-only Gate 0)
-Golden/hash changes: none (no executable golden files exist yet; golden file paths defined in ADR-0006 for future P1-05/P1-08 use)
-Notes: G0-02 specifies SHA-256 for both content and state hashing, canonical Serde JSON serialization with sorted keys and BTreeMap/BTreeSet ordering, included/excluded fields for scenario vs replay hash modes, golden-update policy with review and CI failure requirements, and save-file integrity checks. Dependent on GDD 13 state shapes and GDD 14 content records that already exist.
+Golden/hash changes: none; the first executable goldens are owned by P1-05/P1-08.
+Notes: Audit repair replaces nonexistent library “canonical modes” with project-owned canonical JSON v1, domain-separated SHA-256, explicit snake_case/null/duplicate/float rules, recursive lexicographic object ordering, typed failures, and exact content/scenario/replay-equivalence/save-integrity projections.
 ```
 
 ```text
 Increment: G0-03
 Date: 2026-08-04
-Commit: be0999d
-Requirements: ADR-0007 — Save Envelope Format, Content Hash Placement, and Migration Fixtures; GDD 12 §Save, Load, and Replay; GDD 13 §GameState; ADR-0006 §Save File Hash; ADR-0004 §Save Normalization; ADR-0005 §Content Validation Gate, §CI Policy
-Focused proof: Document consistency check — every save-envelope rule in ADR-0007 references existing GDD 13 serialized shapes, GDD 12 persistence semantics, ADR-0006 canonical serialization and hash rules, ADR-0004 lifecycle normalization, and ADR-0005 content validation policy. No contradiction with any existing ADR, GDD, or TDD. Future executable proof: P1-13 validates save/load round-trip with state-hash integrity and schema migration; P1-13 also verifies migration fixtures against golden hashes.
-Cumulative gates: Document consistency verification (cross-reference check against GDD 12 §Save Load and Replay, GDD 13 §GameState/GameSnapshot, ADR-0006 §Save File Hash, ADR-0004 §Save Normalization, ADR-0005 §Content Validation Gate, ADR-0003 §Command Envelope)
+Commit: 53902e7 (original closure; evidence follow-up be0999d)
+Requirements: ADR-0007 §§1–7; ADR-0004 §Save Normalization; ADR-0006 §§5–7; GDD 12 §Save, Load, and Replay; GDD 13 §Lifecycle, RNG, Commands, and Root State
+Focused proof: Envelope/load-order cross-check. Future executable proof: P1-13 covers canonical save round-trip, exact content compatibility, raw-hash-before-migration validation, every contiguous migration fixture, injected atomic-write failure, and replay equivalence.
+Cumulative gates: Common Gate 0 document audit — passed.
 Scenarios activated: none (doc-only Gate 0)
-Golden/hash changes: none (no executable golden files exist yet)
-Notes: G0-03 resolves three open specification questions: (1) the save envelope is a JSON wrapper with format_version, content_version, state_hash, timestamp, and game_state; (2) the normalized content hash is placed outside GameState (not in the envelope at all — it remains a startup-validation concern); (3) schema migration is one-way with additive transforms, version-numbered fixtures, and golden-hash verification for each migration step. Dependent on ADR-0006 canonical serialization and hash rules, GDD 13 state shapes, and GDD 12 persistence semantics that already exist.
+Golden/hash changes: none; baseline and migration goldens begin at P1-13.
+Notes: Audit repair gives the envelope explicit hash_scheme, schema_version, content_hash, normalized state and state_hash; validates raw saved bytes before migration; separates content and state versions; and defers real historical migration fixtures until a successor schema exists.
 ```
 
 ```text
 Increment: G0-04
 Date: 2026-08-04
-Commit: 41a1779
-Requirements: ADR-0008 — Accepted-Command Persistence; GDD 13 §CommandRecord, §CommandOutcome, §GameState/command_log; ADR-0003 §Command Envelope and Ordering, §Idempotency; ADR-0004 §Save Normalization; ADR-0006 §Replay-mode hash; ADR-0007 §Load procedure
-Focused proof: Document consistency check — every accepted-command persistence rule in ADR-0008 references existing GDD 13 serialized shapes (CommandRecord, CommandOutcome, command_log), ADR-0003 command envelope/idempotency rules, ADR-0004 lifecycle/save normalization, ADR-0006 replay-mode hash policy, and ADR-0007 save envelope/load procedure. No contradiction with any existing ADR, GDD, or TDD. Future executable proof: P1-13 validates save/load round-trip preserves pending commands and idempotency; P1-13 also verifies command_log_replay_equivalence with pending commands serialized in the save.
-Cumulative gates: Document consistency verification (cross-reference check against ADR-0003 §Command Envelope and Ordering, ADR-0004 §Save Normalization, ADR-0006 §Replay hash, ADR-0007 §Load procedure, GDD 13 §CommandRecord/§CommandOutcome/§GameState, TDD 01 §Simulation Actor)
+Commit: 04bb9cf (original closure)
+Requirements: ADR-0008 §§1–7; ADR-0003 §Command Envelope and Ordering and §Idempotency; ADR-0007 §§3–4; GDD 13 §Lifecycle, RNG, Commands, and Root State
+Focused proof: Command/control/save-barrier cross-check. Future executable proof: P1-12 tests full-envelope idempotency and state-replacement receipt merging; P1-13 tests pending replayable commands, FIFO SaveNow inclusion/exclusion, failed writes, load validation, restart import, and replay equivalence.
+Cumulative gates: Common Gate 0 document audit — passed.
 Scenarios activated: none (doc-only Gate 0)
-Golden/hash changes: none (no executable golden files exist yet)
-Notes: G0-04 resolves four open specification questions: (1) pending commands are serialized in command_log with outcome=Accepted — no separate pending_commands field in GameState; (2) the actor drains its mailbox before taking a save snapshot, leaving no mailbox state to serialize; (3) CommandOutcome lifecycle is Accepted→Applied/Rejected, with Accepted indicating a queued-but-unexecuted command; (4) idempotency survives save/load via command_log rebuild, but commands accepted after the last save are lost on process restart and clients must resubmit. Dependent on ADR-0003 command envelope/idempotency rules, ADR-0004 save normalization, ADR-0006 replay-mode hash, ADR-0007 save envelope format, and GDD 13 state shapes that already exist.
+Golden/hash changes: none
+Notes: Audit repair separates replayable commands from actor controls, makes SessionReceiptLedger the session idempotency owner, records expected_tick and stable rejections, defines next_server_sequence as a persisted lower bound, and replaces the impossible mailbox drain with a linearizable FIFO snapshot barrier.
 ```
 
 ```text
 Increment: G0-05
 Date: 2026-08-04
-Commit: 4b760cd
-Requirements: ADR-0009 — Hub Shipyard Queue Semantics; GDD 5 §Station Hub, §Build Work, §Cancellation; GDD 13 §Station, §BuildOrder, §BuildTarget; GDD 7 §Docks and Holding; ADR-0003 §QueueBuildShip; ADR-0008 §Command Record and pending-command rebuild
-Focused proof: Document consistency check — every shipyard queue rule in ADR-0009 references existing GDD 5 station-Hub semantics (one ship at a time, build work values), GDD 13 serialized shapes (Station, BuildOrder, BuildTarget::Ship), GDD 7 dock/holding rules (ship under construction occupies shipyard slot, not a dock), ADR-0003 QueueBuildShip command, and ADR-0008 pending-command rebuild from command_log. No contradiction with any existing ADR, GDD, or TDD. Future executable proof: P1-15 validates QueueBuildShip with queue capacity of 1 active + N pending, FIFO ordering by server_sequence, component staging and return, build progress/completion, cancellation at active vs pending, and save/replay equivalence.
-Cumulative gates: Document consistency verification (cross-reference check against GDD 5 §Station Hub/§Build Work/§Cancellation, GDD 13 §Station/§BuildOrder/§BuildTarget, GDD 7 §Docks and Holding, ADR-0003 §QueueBuildShip, ADR-0006 §Replay hash, ADR-0008 §Command Record)
+Commit: d4f88b0 (original closure)
+Requirements: ADR-0009 §§1–7; GDD 5 §Station Hub, §Build Work, and §Cancellation; GDD 13 §Station and §Construction and Salvage
+Focused proof: Shipyard queue/conservation cross-check. Future executable proof: P1-15 covers one active plus FIFO pending orders, promotion, staging/delivery, active/pending cancellation including loaded inbound cargo, exact component conservation, zero-Fuel ship completion, and save/replay.
+Cumulative gates: Common Gate 0 document audit — passed.
 Scenarios activated: none (doc-only Gate 0)
-Golden/hash changes: none (no executable golden files exist yet)
-Notes: G0-05 resolves six open specification questions: (1) the shipyard queue is a FIFO ordered queue with exactly one active build and zero or more pending orders; (2) the Hub Station carries a serialized `ship_build_queue: BuildOrderId[]` field with the first non-terminal entry being the active build; (3) component staging follows the same BuildOrder staging model as station construction — local components move into staging immediately, Cargo Ships deliver the remainder; (4) the Hub contributes 1 work per tick to the active build, and completion creates a new Ship entity docked and idle at the Hub with full fuel and authored installed components; (5) cancellation returns staged components to the Hub (or salvage overflow), loses progress work, and distinguishes active vs pending cancellation; (6) the `ship_build_queue` field is serialized in GameState and included in the replay-mode hash. Dependent on GDD 5 station-Hub semantics, GDD 13 serialized shapes, GDD 7 dock/holding rules, ADR-0003 QueueBuildShip, and ADR-0008 pending-command rebuild that already exist.
+Golden/hash changes: none
+Notes: Audit repair makes only queue index zero active and demand-producing, defines terminal/history behavior and inbound cancellation, preserves complete component multisets, and creates ships with zero Fuel and zero remainders so normal deterministic refueling supplies them.
 ```
 
 ```text
 Increment: G0-06
 Date: 2026-08-04
-Commit: b2d034c
-Requirements: ADR-0010 — Mining Boundary Behavior; GDD 12 §Mining; GDD 5 §Mining Station; GDD 14 §The Veil; GDD 13 §MiningTarget, §ResourceDeposit, §Station; ADR-0006 §Replay-mode hash
-Focused proof: Document consistency check — every mining-boundary rule in ADR-0010 references existing GDD 12 accumulator formulas, GDD 5 mining-station semantics (tier targets, retune), GDD 14 belt-drift formula and ResourceType ordering, GDD 13 serialized shapes (MiningTarget, ResourceDeposit, Station.mining_targets), and ADR-0006 replay-mode hash policy. No contradiction with any existing ADR, GDD, or TDD. Future executable proof: P1-17 validates full-output stalling, finite-deposit exhaustion with remainder reset, and belt-drift-before-extraction on tick 1000; P1-26 validates belt_drift_determinism across save/load and replay.
-Cumulative gates: Document consistency verification (cross-reference check against GDD 12 §Mining, GDD 5 §Mining Station, GDD 14 §The Veil, GDD 13 §MiningTarget/§ResourceDeposit/§Station, ADR-0006 §Replay-mode hash, ADR-0007 §Save file serialization)
+Commit: d915d15 (original closure)
+Requirements: ADR-0010 §§1–7; GDD 12 §Mining drift, retune, and extraction reducers; GDD 13 §Buffers and Production; GDD 14 §The Veil
+Focused proof: Mining reducer/boundary cross-check. Future executable proof: P1-17 covers slot identity, repeated retunes, partial/full capacity, exact/excess exhaustion, shared-deposit contention and conservation; P1-26 covers tick-999→1,000 drift, save/load, replay, and PRNG equality.
+Cumulative gates: Common Gate 0 document audit — passed.
 Scenarios activated: none (doc-only Gate 0)
-Golden/hash changes: none (no executable golden files exist yet)
-Notes: G0-06 resolves three open specification questions: (1) full-output handling — extraction stalls when the buffer is full; the accumulator is not advanced during blockage; (2) finite-deposit exhaustion — extraction is capped by remaining deposit amount; the accumulator remainder is reset when the deposit runs out, losing at most 999 + increment milli-units; a depleted deposit causes extraction to skip entirely on subsequent ticks; (3) extraction/belt-drift order — belt drift occurs before extraction on tick multiples of 1,000, using ResourceType enum ordering for deterministic drift-event sequencing; the belt extraction accumulator formula is explicitly defined as remainder += base_quantity * deposit.current with denominator cycle_ticks * baseline. Dependent on GDD 12 accumulator formulas, GDD 5 mining-station semantics, GDD 14 belt-drift definition, and GDD 13 serialized shapes that already exist.
+Golden/hash changes: none
+Notes: Audit repair adds serialized slot_index and exact ten-resulting-tick retune state, capacity-safe extraction with no material loss, stable shared-deposit reduction, and drift based on the resulting tick before extraction from one immutable density fact.
 ```
 
 ```text
 Increment: G0-07
 Date: 2026-08-04
-Commit: (pending — no production code changed)
-Requirements: ADR-0011 — Deterministic Refueling; GDD 12 §Ship Jobs and Refueling, §Fuel Accumulator, §Docks and Transfers; GDD 13 §Ships and Jobs (ShipJob::Refuel); GDD 3 §Fuel; GDD 7 §Fuel Safety, §Deterministic Cargo Matching; ADR-0009 §Full-fuel initialization; ADR-0002 §Deterministic Tick Simulation
-Focused proof: Document consistency check — every refueling rule in ADR-0011 references existing GDD 12 fuel accumulator formulas, GDD 12 dock/transfer semantics, GDD 13 ShipJob::Refuel shape, GDD 3 fuel rules and distributed storage, GDD 7 fuel safety and tie-break patterns, and ADR-0009/ADR-0002. No contradiction with any existing ADR, GDD, or TDD. Future executable proof: P1-20 validates multi-body delivery with fuel debit and arrival isolation; P1-21 validates refuel job assignment, reservation_contention, fuel_rescue_recovery, no double reservation/overfill, and that loaded jobs never expire or rescue.
-Cumulative gates: Document consistency verification (cross-reference check against GDD 12 §Ship Jobs and Refueling/§Fuel Accumulator/§Docks and Transfers, GDD 13 §Ships and Jobs, GDD 3 §Fuel/§Distributed Storage, GDD 7 §Fuel Safety/§Deterministic Cargo Matching, ADR-0009 §Full-fuel initialization, ADR-0002 §Deterministic Tick Simulation)
+Commit: 0d2a2a9 (original closure)
+Requirements: ADR-0011 §§1–8; GDD 3 §Fuel; GDD 7 §Fuel Safety and §Deterministic Cargo Matching; GDD 12 §Movement, Fuel, Life Support, and Refueling
+Focused proof: Refuel feasibility/arrival-order cross-check. Future executable proof: P1-20 proves exact cloned-remainder Fuel/Life Support feasibility and final-leg debit; P1-21 proves reservation contention, full/partial/zero direct transfers, all-role assignment, export-floor independence, and Hub rescue boundaries.
+Cumulative gates: Common Gate 0 document audit — passed.
 Scenarios activated: none (doc-only Gate 0)
-Golden/hash changes: none (no executable golden files exist yet)
-Notes: G0-07 resolves nine open specification questions: (1) eligible roles — all roles (Cargo, Construction, Research) may receive a Refuel job; (2) refuel trigger priority — low-fuel ships refuel before ordinary work, not after feasibility failure; (3) fuel-station selection — nearest reachable station with fuel_buffer.current > export_threshold, tie-broken by route distance then station ID; (4) "reachable" defined as one-way empty trip using actual fuel formula, no 10% reserve required; (5) transfer quantity is min(available station fuel, ship deficit); (6) transfer is atomic on arrival tick, no cargo reservation; (7) partial stock leaves ship with partial fuel, no error; (8) Refuel arrival occupies one dock like cargo arrival; (9) job lifecycle: Idle → RefuelAssigned → InTransit → Arrival → fuel transfer → Idle docked. GDD 12 job table updated to include Refuel for Construction and Research roles. Dependent on GDD 12 fuel accumulator formulas, GDD 13 ShipJob::Refuel shape, GDD 3 fuel/distributed-storage rules, GDD 7 fuel safety/tie-break patterns, ADR-0009 full-fuel initialization, and ADR-0002 deterministic tick simulation that already exist.
+Golden/hash changes: none
+Notes: Audit repair accepts the ADR, distinguishes direct unreserved Fuel from Cargo export floors, covers every ship role, defines exact one-way feasibility, phases final movement debit before arrival transfer, orders contention by ShipId, and makes an origin-Hub wait the only non-self-rescuing boundary.
 ```
 
 ```text
 Increment: G0-08
 Date: 2026-08-04
-Commit: ed287f5
-Requirements: ADR-0012 — Command/Event Wire Contracts; ADR-0003 §Command Envelope and Ordering, §V1 Commands, §Events and Resynchronization; ADR-0004 §Lifecycle Transitions; ADR-0006 §Replay-mode hash; ADR-0007 §Save Envelope; ADR-0008 §Command Record; GDD 12 §Tick Transaction, §Research, §Save/Load/Replay; GDD 13 §ResearchProject, §ResearchState, §Reservation, §GameState; TDD 00 §Actor Transactions, §Event Broadcast; TDD 02 §Events, §StateDelta
-Focused proof: Document consistency check — every event type, StateDelta rule, durability classification, and research reassignment rule in ADR-0012 references existing ADR-0003 command catalog and event shapes, ADR-0004 lifecycle transitions, ADR-0006/ADR-0007/ADR-0008 persistence/hash rules, GDD 12 tick transaction and research semantics, GDD 13 serialized state shapes, TDD 00 actor transaction model, and TDD 02 event protocol examples. No contradiction with any existing ADR, GDD, or TDD. Future executable proof: P1-22 validates QueueResearch with reassignment and research resume events; P1-31 validates exhaustive event surface, StateDelta replacement/removal, durable vs coalescible classification, and research reassignment event coverage.
-Cumulative gates: Document consistency verification (cross-reference check against ADR-0003 §Command Envelope and Ordering/§V1 Commands/§Events and Resynchronization, ADR-0004 §Lifecycle/§Transitions, ADR-0006 §Replay hash, ADR-0007 §Save Envelope, ADR-0008 §Command Record, GDD 12 §Tick Transaction/§Research/§Save/Load/Replay, GDD 13 §ResearchProject/§ResearchState/§Reservation/§GameState, TDD 00 §Actor Transactions/§Event Broadcast, TDD 02 §Events/§StateDelta)
+Commit: ed287f5 (original closure)
+Requirements: ADR-0012 §§1–8; ADR-0003 §V1 Commands and §Events and Resynchronization; GDD 13 §Lifecycle, RNG, Commands, and Root State and §Research; TDD 02 §Events
+Focused proof: Exhaustive wire-union/cache/research cross-check. Future executable proof: P1-22 covers pause/resume/reassignment material location and NoResearchShip; P1-31 covers every retained event, full root/entity replacement, deletion, retention, polling, and resync; P1-32 repeats the shared corpus under WebSocket backpressure.
+Cumulative gates: Common Gate 0 document audit — passed.
 Scenarios activated: none (doc-only Gate 0)
-Golden/hash changes: none (no executable golden files exist yet)
-Notes: G0-08 resolves four open specification questions: (1) exhaustive event type catalog with JSON payload shapes for every committed transaction event — LifecycleChange, CommandApplied, CommandRejected, EntityCreated, EntityRemoved, StateDelta, BuildComplete, ResearchComplete, ResearchProgress, SurveyComplete, ArrivalEvent, GatePhaseProgress, BottleneckWarning, BottleneckCleared, SalvageCreated, ResearchResumed; (2) StateDelta uses replacement semantics (not recursive patching) with separate changed_entities and removed_entities arrays; map entries are complete replacements keyed by resource/slot; (3) durable events (must survive retention ring and may not be coalesced) vs coalescible events (StateDelta, ResearchProgress, SurveyProgress, ConstructionProgress — may be dropped by slow queues); (4) research reassignment preserves progress and consumed-resource credit, creates a ResearchResumed event, and distinguishes Hub built-in research (limited by built_in_research_max_tier) from Research Station projects (require docked Research Ship). Dependent on ADR-0003 command catalog and event shapes, ADR-0004 lifecycle transitions, ADR-0006/ADR-0007/ADR-0008 persistence/hash rules, GDD 12 tick transaction and research semantics, GDD 13 serialized state shapes, TDD 00 actor transaction model, and TDD 02 event protocol examples that already exist.
+Golden/hash changes: none
+Notes: Audit repair defines an exhaustive retained-event union including CommandFailed and RuntimeError, stable event order, full-replacement StateDelta with durable continuity, progress-only queue coalescence, a bounded canonical ring and forced resync, plus research reassignment that preserves consumed credit without teleporting unused stock or inventing Hub tiers.
 ```
 
 ```text
 Increment: G0-09
 Date: 2026-08-04
-Commit: 3455791
-Requirements: ADR-0005 — Test Architecture §CI Policy; TDD 04 — Testing Strategy §Quality Gates; IMPLEMENTATION_PLAN.md — Delivery Principles §cumulative-gate, §Per-turn protocol step 7, §Phase 1 completion gate; AGENTS.md — §Verification order
-Focused proof: Focused text/link consistency review — every CI policy statement in ADR-0005, TDD 04, this plan, and AGENTS.md now expresses the same cumulative-gate policy during Phase 1 greenfield construction: (1) every commit runs all gates activated so far; (2) scenarios whose owning increment has not yet completed are not required; (3) API, persistence/replay, and Python gates become mandatory only when their owning infrastructure increment exists; (4) macOS CI runs every commit, Windows CI at P1-36; (5) at Phase 1 completion, the full Phase 1 completion gate is mandatory. Future executable proof: P1-01 automates protocol/policy synchronization via a marker-based check that the duplicated per-turn protocol is byte-identical in both documents.
-Cumulative gates: Document consistency verification (cross-reference check against ADR-0005 §CI Policy, TDD 04 §Quality Gates, this plan §Delivery Principles/§Per-turn protocol step 7/§Phase 1 completion gate, AGENTS.md §Verification order)
+Commit: 3455791 (original closure)
+Requirements: ADR-0005 §CI Policy — Greenfield Construction; TDD 04 §Quality Gates; this plan §Gate activation matrix and §Phase 1 completion gate; AGENTS.md §Verification order; TDD 05 §CI Staging and Matrix
+Focused proof: Staged-gate policy comparison. Future executable proof: P1-01 adds marker-based protocol equality and a staged policy manifest/check; each later owning increment activates only its named cumulative or qualification gate.
+Cumulative gates: Common Gate 0 document audit — passed; the per-turn protocol block is byte-identical between AGENTS.md and this plan.
 Scenarios activated: none (doc-only Gate 0)
-Golden/hash changes: none (no executable golden files exist yet)
-Notes: G0-09 reconciles four documents to state the same cumulative CI policy during greenfield construction. Prior inconsistency: ADR-0005 required "all deterministic scenarios including Gate victory" from day one even though those scenarios don't exist yet, and required cross-platform CI from day one. TDD 04 presented a fixed list with no cumulative semantics. The plan and AGENTS.md already had cumulative language in delivery principles but their verification-order sections were a fixed list. All four documents now explicitly describe (a) Phase 1 greenfield construction with cumulative gates, (b) Phase 1 completion gate as the final mandatory gate, and (c) platform-CI phasing. P1-01 will add automated protocol/policy synchronization.
+Golden/hash changes: none
+Notes: Audit repair stages REST at P1-14, polling at P1-31, WebSocket at P1-32, Python/TUI at P1-34, long agent clients as P1-35 qualification, Windows build/test CI as a P1-36 commit gate, and hashes/benchmark/artifacts/SBOM as P1-36 qualification. The complete Phase 1 gate remains mandatory.
 ```

@@ -8,260 +8,269 @@ date: 2026-08-04
 
 ## Context
 
-Phase 1 requires ship construction at Station Hub shipyards. GDD 5 §Station Hub
-establishes that "every tier has one shipyard queue and one slow component-assembly
-slot" and "ship construction, one ship order at a time." GDD 13 defines
-`StationStats.shipyard_slots: u8` as always 1 for Hub and 0 otherwise. GDD 13 also
-defines `BuildTarget::Ship { hub_id, role, tier }` and `BuildOrder` with its
-`components_required`, `components_delivered`, `builder_ship_id`, `progress_work`,
-`total_work`, and `state` fields. ADR-0003 defines the `QueueBuildShip` command.
-GDD 5 §Build Work assigns ship build work values (30/60/120/240 for T1/T2/T3/T4)
-and states "Hub shipyards contribute one ship-build work per tick." GDD 7 §Docks
-and Holding specifies that "a ship under construction occupies the Hub shipyard
-slot, not an ordinary dock until completion."
+Every Station Hub has one authored shipyard work slot. Ship construction uses the
+ordinary `BuildOrder` component-staging model, but it never uses a Construction
+Ship: the target Hub supplies one work per tick.
 
-Six unresolved specification questions remain:
-
-1. **Queue structure.** With `shipyard_slots = 1` and "one ship order at a time,"
-   does the shipyard accept a second `QueueBuildShip` while one is active, or does
-   it reject with an error? If it accepts, how are pending orders ordered?
-
-2. **Queue representation in state.** The Hub Station struct (GDD 13) has no field
-   linking it to its active or pending ship BuildOrders. How does the Hub know
-   which BuildOrder is currently under construction and which are queued behind it?
-
-3. **Component staging for ship builds.** GDD 5 §Building and Upgrading describes
-   station construction staging at the source Hub. For ship builds at the Hub, the
-   Hub is both the builder and the source. How do components move into staging? Do
-   Cargo Ships deliver remote components for ship builds?
-
-4. **Build progress and completion.** Hub contributes 1 work per tick. How does
-   this advance `BuildOrder.progress_work`? What happens when `progress_work >=
-   total_work`? Where does the completed ship appear?
-
-5. **Cancellation semantics.** What happens to staged components and progress work
-   when a ship build is cancelled? Does cancellation of a pending (non-active)
-   order differ from cancellation of the active order?
-
-6. **Serialized fields beyond BuildOrder.** Which additional fields must the Hub
-   Station carry to represent its shipyard queue, and what invariants apply?
+The serialized model needs to distinguish the order occupying that work slot from
+orders merely waiting behind it, define when component demand begins, recover
+every material during cancellation, and avoid creating Fuel on completion.
 
 ## Decision
 
-### 1. The shipyard queue is a FIFO ordered queue with exactly one active build
+### 1. Capacity is one active slot plus an ordered pending queue
 
-The Hub shipyard accepts `QueueBuildShip` commands while an active build is in
-progress. The new order is appended to a **pending queue** and does not begin
-staging or construction until the active build completes. This means:
+`StationStats.shipyard_slots` is active-work capacity. In V1 it must be exactly 1
+for a Hub and 0 for every other station. A Hub therefore has:
 
-- At any time, at most one BuildOrder with `BuildTarget::Ship` targeting this Hub
-  is in state `Building` (the active build).
-- Zero or more BuildOrders with `BuildTarget::Ship` targeting this Hub are in
-  state `AwaitingMaterials` (pending, not yet started).
-- The queue order is **creation `server_sequence`** (the order in which the
-  commands were accepted), matching the ordering principle used by construction
-  ship selection in GDD 7 §Construction and Survey Jobs.
+- zero or one **active-slot order**: the first ID in `ship_build_queue`; and
+- zero or more **pending orders**: every later ID.
 
-Rejection occurs only when the Hub's shipyard is physically incapable of accepting
-another order—specifically, when the component cost cannot fit in the Hub's
-available general cargo capacity after the active order's staging reservation is
-subtracted, or when the required technology is not unlocked. These are domain
-validation rejections, not a queue-full rejection.
+V1 has no separate gameplay queue-depth cap. A valid `QueueBuildShip` may append a
+pending order regardless of current component stock or Hub general-cargo free
+space. API body/rate limits protect the process, but they do not change simulation
+acceptance or create a platform-dependent queue limit.
 
-**Rationale.** A multi-order queue lets the player chain multiple ship builds
-without micro-managing each command after completion. The single active build
-preserves "one ship order at a time." FIFO ordering by server_sequence is the
-simplest deterministic model and matches every other ordered queue in the
-simulation (survey orders, construction ship selection).
+Queue acceptance validates the Hub/type, target role and tier, unlocked
+technology, and authored definition. It does not reject for material shortage:
+that shortage is represented by the active order's `AwaitingMaterials` state.
+BuildOrder staging is outside general cargo, so general cargo capacity is not a
+queue-capacity test.
 
-### 2. Hub Station carries an ordered ship_build_queue field
+The queue is FIFO by `BuildOrder.created_server_sequence`, then BuildOrder ID as
+an invariant-only diagnostic tie-break. Since command sequences are unique, the
+tie-break is never reached in a valid state.
 
-The Hub Station struct gains:
+### 2. Serialized queue representation and invariants
+
+The Hub `Station` carries:
 
 ```text
-struct Station {
-  // ... existing fields ...
-  ship_build_queue: BuildOrderId[]  // ordered queue; first = active build (if any)
-  // ... no new active_ship_build_id — the first non-terminal entry IS the active build
-}
+ship_build_queue: BuildOrderId[]
 ```
 
-**Invariants:**
+The array contains only nonterminal `BuildTarget::Ship` orders for that Hub. It is
+included transitively in canonical state/save/replay serialization.
 
-- `ship_build_queue` is non-empty only for Hub stations.
-- `ship_build_queue` has at most one entry with BuildState `Building` or
-  `Traveling` or `Evacuating` — that entry is the active build.
-- All other entries have BuildState `AwaitingMaterials` or `Cancelled` (a
-  cancelled pending entry is removed from the queue on next tick maintenance).
-- The maximum length of `ship_build_queue` is bounded only by authored Hub cargo
-  capacity and component availability; there is no separate hard queue-depth limit.
-- `ship_build_queue` entries reference valid `BuildOrderId` values in
-  `GameState.build_orders`.
+The complete invariants are:
 
-**Rationale.** A single ordered list of IDs is simpler than separate
-`active_ship_build_id` and `pending_ship_build_queue` fields. The active build is
-the first non-terminal entry. This avoids maintaining two separate invariants.
-BuildOrder state already captures the build lifecycle (AwaitingMaterials →
-Ready → Building → Complete/Cancelled). The queue is only the ordering mechanism.
+- Non-Hub stations have an empty queue.
+- Each ID resolves to exactly one `GameState.build_orders` record whose target Hub
+  and `source_station_id` equal this Hub.
+- Every nonterminal ship BuildOrder appears exactly once in exactly one Hub queue.
+- `Complete` and `Cancelled` orders remain available in the top-level history but
+  never remain in a Hub queue and have empty staging. A cancelled ship order has
+  zero progress; a complete order retains its exact completed work total.
+- IDs are in strictly increasing `created_server_sequence` order.
+- The first order may be `AwaitingMaterials`, `Ready`, `Building`, or
+  `Cancelling`; it is the only order occupying the active slot.
+- Every later order is `AwaitingMaterials`, has zero progress, an empty
+  `components_delivered` map, no builder, and no logistics reservation targeting
+  it.
+- Ship orders never enter `Traveling` or `Evacuating` and never have a
+  `builder_ship_id`.
+- For every component,
+  `components_delivered[resource] <= components_required[resource]`; unlisted
+  values are zero. An active `AwaitingMaterials` order has at least one strictly
+  missing unit; `Ready` and `Building` require exact per-resource equality.
+- `AwaitingMaterials` and `Ready` have zero progress; `Building` has
+  `progress_work < total_work`; `Complete` has exact total work.
+- A `Cancelling` order has zero progress and no `AwaitingPickup` reservation; it
+  may temporarily contain recovery staging and retain `Loaded` reservations.
+- Only an active `AwaitingMaterials` order advertises component demand. Pending,
+  `Ready`, `Building`, and `Cancelling` orders advertise none.
 
-### 3. Component staging follows the same rules as station builds
+Malformed saves violating any invariant are rejected rather than repaired or
+reordered.
 
-Ship construction uses the identical staging model from GDD 5 §Building and
-Upgrading:
+### 3. Creation and activation
 
-1. On `QueueBuildShip`, a new `BuildOrder` with `BuildTarget::Ship` is created.
-   Its `source_station_id` is the target Hub.
-2. At creation, the Hub's unreserved matching component inventory moves directly
-   into `components_delivered` (staging), exactly as GDD 12 §Supply Demand and
-   Reservations describes for ordinary BuildOrders: "matching unreserved
-   components already at its source Hub move directly into staging without a
-   Cargo Ship."
-3. The remaining unfulfilled `components_required` map is exposed as logistics
-   demand at the Hub's priority, using the Hub's dock for delivery into staging.
-4. Cargo Ships deliver remote components to the Hub's dock; each delivery
-   increments `components_delivered`.
-5. The order transitions to `Ready` state when `components_delivered ==
-   components_required`.
+Applying `QueueBuildShip` creates a BuildOrder with:
 
-There is **no Construction Ship involvement** for ship builds. The Hub itself
-provides the build work.
+- `target = Ship { hub_id, role, tier }`;
+- `source_station_id = hub_id`;
+- the authored component cost and work total;
+- empty `components_delivered`;
+- zero progress, null builder, and `AwaitingMaterials` state; and
+- the command's `server_sequence` as `created_server_sequence`.
 
-**Rationale.** Reusing the existing BuildOrder staging model avoids a special
-case for ship construction. The Hub's own inventory supplies local components,
-and Cargo Ships supply the rest—the same logistics pattern used everywhere else.
-No Construction Ship is needed because the Hub's shipyard is a fixed facility,
-not a mobile builder.
+The ID is appended to `ship_build_queue`.
 
-### 4. Build progress and completion
+If it is the first entry, activation occurs in that same command transaction:
+matching unreserved component units move from Hub buffers into staging in
+`ResourceType` order, capped exactly by the missing manifest. Staging does not
+consume general-cargo capacity. If the manifest becomes exact, the order enters
+`Ready`; otherwise only its missing map is exposed as BuildOrder demand during a
+later logistics rebuild.
 
-Each tick, when the Hub has an active (Building) ship BuildOrder:
+If another entry is already active, the new order remains a resource-neutral
+pending record. It stages nothing, creates no inbound reservation, and advertises
+no demand until it reaches the first position.
 
-1. The Hub contributes 1 work to `BuildOrder.progress_work`.
-2. When `progress_work >= total_work`:
-   a. A new `Ship` entity is created with the authored `ShipDefinition` stats
-      for the target `role` and `tier`. Its `id` is generated from
-      `IdCounters.ship`.
-   b. The ship's `installed_components` is set to the authored component cost
-      map for that ship definition. These components are consumed from the
-      build order staging (they become installed, not loose).
-   c. The ship is placed at the Hub's system position, `docked_at: hub_id`,
-      state `Idle`, job `Idle`, and fuel set to `max_fuel` (full tank).
-   d. The BuildOrder enters `Complete` state.
-   e. The Hub's `ship_build_queue` advances: the completed entry is removed.
-      If a pending entry exists, it becomes the new active build and begins
-      component staging on the next tick's construction phase.
+When completion or cancellation removes the first ID, the next ID occupies the
+active slot immediately by queue position. Because removal commits at the tick
+boundary, the next order is first seen as active on the following construction
+phase. Every construction phase idempotently offers the active
+`AwaitingMaterials` order unreserved local components before testing readiness;
+there is no un-serialized "newly promoted" flag. Missing demand becomes visible
+when a later logistics phase reads the committed staging result.
 
-The new ship is immediately available for job assignment in the next logistics
-phase. It does not need a separate "launch" animation—it appears docked and idle
-at the Hub.
+### 4. Delivery and readiness
 
-**Rationale.** Placing the completed ship docked and idle at the Hub means it
-can participate in logistics immediately. Full-fuel initialization avoids a
-refuel bottleneck for freshly built ships. Using authored component cost as
-installed components means scrapping recovers the correct component set.
+Normal Cargo reservations may target only the active order's exact missing map.
+BuildOrder staging, not Hub buffer capacity, reserves destination capacity. A
+delivery is capped by the still-missing per-resource amount, preventing
+overdelivery.
 
-### 5. Cancellation semantics
+When `components_delivered` equals `components_required` for every key, the active
+order enters `Ready`. Equality is per resource; map ordering or a language-level
+map comparison is never used as a quantity relation.
 
-Cancelling a ship BuildOrder follows GDD 5 §Cancellation Demolition and Scrapping:
+### 5. Work and completion timing
 
-**Active build (state = Building or Ready or AwaitingMaterials with components
-staged):**
+During construction phase 5, the Hub examines the committed active order:
 
-- All staged components in `components_delivered` return to the Hub's general
-  cargo inventory (or Hub-side salvage if cargo capacity is insufficient).
-- The BuildOrder enters `Cancelled` state.
-- Progress work (`progress_work`) is **lost** — it represents irreversible
-  fabrication labor, not recoverable materials.
-- The order is removed from `ship_build_queue`. The next pending entry (if any)
-  becomes active and begins staging on the next construction phase.
+1. `AwaitingMaterials`: no work.
+2. `Ready`: transition to `Building`; contribute no work on this transition tick.
+3. `Building`: add exactly one checked work unit.
+4. `Cancelling`: run the recovery maintenance in §6; contribute no work.
 
-**Pending build (state = AwaitingMaterials, no components staged because it
-hasn't reached the active slot yet):**
+If checked progress reaches the exact authored total, completion is one atomic
+transaction:
 
-- No components have been staged, so nothing to return.
-- The BuildOrder enters `Cancelled` state.
-- The order is removed from `ship_build_queue`. No effect on the active build.
+1. Validate the staged map exactly equals the authored component cost.
+2. Move the entire map from `components_delivered` into the new Ship's
+   `installed_components`, leaving the BuildOrder staging map empty. This is a
+   move, not a copy.
+3. Generate the Ship ID from the serialized ship counter and construct the exact
+   authored role/tier stats.
+4. Set Cargo/build holds empty with their role-appropriate null/zero fields; set
+   `fuel = 0`, both Fuel remainders to zero, `state = Idle`, `job = Idle`,
+   `travel_plan = null`, `docked_at = hub_id`, and position to the Hub's body
+   position. Insert the ID in the Hub's canonically sorted docked-location list;
+   this marker is not a persistent dock reservation.
+5. Mark the BuildOrder `Complete` and remove its ID from `ship_build_queue` in the
+   same transaction.
 
-Cancellation of a pending order is always safe because no resources have been
-committed. Cancellation of the active order returns staged components to the Hub
-inventory, which may exceed buffer capacity—the overflow goes to a permanent
-salvage cache at that Hub (same rule as station build cancellation).
+Ship construction never creates Fuel. On a later tick the ordinary deterministic
+refueling rules may perform a zero-distance transfer from the Hub Fuel compartment
+before the ship takes productive work. That transfer debits the Hub exactly and
+therefore remains conservation-safe.
 
-**Rationale.** Distinguishing active vs pending cancellation avoids unnecessary
-component return processing for orders that never staged anything. Losing
-progress work on the active build is consistent with the irreversible nature of
-fabrication work (GDD 5 §Cancellation: "staged components return" but work is
-not recovered). This matches station build cancellation semantics.
+The entity creation commits at the end of the tick. Under the immutable phase
+contract it is not visible to phase 9 of its creation tick and first becomes
+eligible for refueling/job assignment in phase 9 of the next tick. An idle
+`docked_at` marker is not a persistent dock reservation, so completion does not
+require an ordinary arrival dock; the order occupied the shipyard slot until the
+commit.
 
-### 6. Queue maintenance and invariants
+### 6. Cancellation and in-flight recovery
 
-**Tick maintenance.** During the construction phase (phase 5 of the tick
-transaction), the Hub performs these operations in order:
+Cancellation loses only fabrication work. Components, reservations, and Cargo
+payload are always recovered.
 
-1. If the active build is `Complete` or `Cancelled`, remove it from
-   `ship_build_queue`.
-2. If `ship_build_queue` is non-empty and the first entry has state
-   `AwaitingMaterials`, check if `components_delivered >= components_required`:
-   - If yes, transition to `Ready` and then immediately to `Building` (the Hub
-     needs no travel—it is already at the site). The Hub starts contributing
-     1 work per tick on the next construction phase.
-3. If the active build is `Building`, add 1 to `progress_work`. Check for
-   completion (see §4 above).
-4. Remove any `Cancelled` entries from the queue (they are cleaned up
-   regardless of position).
+#### Pending order
 
-**Idempotency and replay.** The `ship_build_queue` is serialized in `GameState`
-and included in the replay-mode hash. On load, the queue is restored exactly.
-Pending commands that were accepted but not yet reflected in the queue are
-rebuilt from `command_log` per ADR-0008.
+A pending order has no staging or reservations by invariant. Cancellation marks
+it `Cancelled` and removes its ID atomically. It never affects the active order.
 
-**Serialization.** The `ship_build_queue` field is serialized as an ordered array
-of `BuildOrderId` strings. It appears in the Hub `Station` struct and therefore
-in `GameState.stations`. No separate top-level collection is needed.
+#### Active order with no loaded inbound reservation
+
+The cancellation transaction:
+
+1. Releases every `AwaitingPickup` logistics reservation targeting the order and
+   returns its source claim unchanged.
+2. Moves all staged components back into compatible Hub buffers up to their
+   maxima, in `ResourceType` order.
+3. Places any overflow into at most one newly generated permanent salvage cache
+   at the Hub position for that return transaction.
+4. Clears `components_delivered`, resets `progress_work` to zero, marks the order
+   `Cancelled`, and removes it from the queue.
+
+The next pending order activates at the next construction phase as defined in
+§3.
+
+#### Active order with loaded inbound Cargo
+
+Loaded reservations never expire and loaded Cargo is never discarded. If any
+`Loaded` reservation targets the active order, the cancellation command:
+
+1. Releases only `AwaitingPickup` reservations.
+2. Returns currently staged components to Hub buffers/salvage and clears staging.
+3. Resets `progress_work` to zero, sets the BuildOrder to `Cancelling`, with zero
+   further demand or work, and leaves it first in the queue.
+4. Leaves each loaded transport and reservation intact. The Cargo Ship completes
+   its already-fuel-feasible delivery to the BuildOrder at the source Hub.
+
+An arrival into a `Cancelling` BuildOrder is allowed and moves the loaded units
+into its staging map solely as recovery transit. On the next construction phase,
+the Hub moves those units from staging into compatible buffers/salvage using the
+same deterministic return rule. When no `Loaded` reservation targets the order
+and staging is empty, maintenance marks it `Cancelled` and removes it atomically.
+
+This may hold the shipyard slot while remote loaded Cargo returns, but it prevents
+a later build from becoming active while material belonging to the cancelled
+manifest is still in flight. Awaiting-pickup Cargo jobs whose reservations were
+released finish their current empty travel leg and become Idle under the ordinary
+reservation-expiry/cancellation rule.
+
+Each overflow-return transaction creates at most one salvage cache, using the
+serialized salvage counter. Caches never decay and are normal logistics supply;
+their IDs, positions, and maps make recovery deterministic across save/load.
+
+### 7. Queue maintenance order
+
+At phase 5, Hubs are processed by ascending Hub ID. For each Hub:
+
+1. Validate the queue invariants against the committed snapshot.
+2. If the first order is `AwaitingMaterials`, idempotently move any matching
+   unreserved local components into its still-missing staging map.
+3. Apply the state-specific work/recovery rule from §§5–6.
+4. Stage terminal-order removal and Ship/salvage creation atomically.
+
+There is no separate cleanup pass that leaves terminal IDs serialized for another
+tick. All arithmetic and counter increments are checked; failure rolls the entire
+tick transaction back.
+
+## Required executable proofs
+
+P1-15 and later logistics increments must cover:
+
+- One active order plus multiple pending orders retain strict FIFO order through
+  save/load and replay.
+- Pending orders stage no stock, create no reservation, and advertise no demand.
+- Promotion/local staging is idempotent, never duplicates stock, and exposes only
+  the active order's missing map.
+- General cargo capacity does not reject or constrain BuildOrder staging.
+- Readiness uses exact per-resource equality and delivery never exceeds the
+  manifest.
+- Ready/Building timing contributes exactly the authored work and completion is
+  visible only after commit.
+- Completion clears staging, installs exactly the component recipe, and creates a
+  zero-Fuel ship.
+- Building then scrapping a ship cannot create Fuel or duplicate components.
+- Cancellation at pending, AwaitingMaterials, Ready, Building, and Cancelling
+  states preserves the whole component multiset.
+- AwaitingPickup cancellation releases both reservation sides; loaded inbound
+  Cargo finishes and is recovered without loss or double counting.
+- Buffer overflow creates permanent, logistics-recoverable salvage.
+- Every state change above retains canonical-hash, save/load, command replay, and
+  whole-economy conservation equivalence.
 
 ## Consequences
 
-### Positive
-
-- A clear FIFO queue model lets players chain ship builds without manual
-  re-queueing after each completion.
-- Reusing BuildOrder staging for components avoids a separate ship-build
-  material-tracking system.
-- No Construction Ship involvement for ship builds keeps the model simple—the
-  Hub provides build work directly.
-- Cancellation semantics distinguish active vs pending, avoiding unnecessary
-  work for orders that never started.
-- The single `ship_build_queue: BuildOrderId[]` field is minimal: no separate
-  active/pending split, no new state machine.
-
-### Negative
-
-- The queue is serialized and grows over a session. At V1 scale (tens or
-  hundreds of ships over hours) this is negligible.
-- Pending orders reserve no components until they reach the active slot. A
-  player could queue many orders that later cannot be fulfilled due to component
-  shortages, but this is a player-planning concern, not a simulation invariant.
-- The Hub's component staging for the active build reduces available general
-  cargo capacity until completion or cancellation. A large active build (T4
-  Fast Freighter) may crowd out other Hub storage. This is an authored-balance
-  concern handled by GDD 14's capacity values.
-
-### Mitigations
-
-- Queue length is self-limiting: each pending order exposes demand, consuming
-  logistics bandwidth. The player naturally limits queue depth to available
-  components.
-- Component staging returns to Hub inventory on cancellation, preserving the
-  always-solvable invariant.
-- Full-fuel initialization on completion prevents stranded newly-built ships.
+- Players may plan multiple ship builds while one physical shipyard slot remains
+  the only active work source.
+- Pending orders cannot reserve the entire economy or create phantom demand.
+- A blocked first order intentionally blocks later FIFO entries.
+- Newly completed ships require real station Fuel before productive work.
+- Cancellation may temporarily hold the active slot for already-loaded inbound
+  Cargo, trading immediate queue progress for strict material conservation.
 
 ## Related ADRs
 
-- ADR-0003 — Command/Query API with WebSocket Streaming (defines
-  `QueueBuildShip`, command envelope, server_sequence ordering)
-- ADR-0006 — Canonical Content/State Hashing (replay-mode hash includes
-  ship_build_queue)
-- ADR-0007 — Save Envelope Format, Content Hash Placement, and Migration
-  Fixtures (serialization of ship_build_queue in save files)
-- ADR-0008 — Accepted-Command Persistence (pending-command rebuild on load
-  restores ship_build_queue from command_log)
+- ADR-0003 — Command/Query API with WebSocket Streaming
+- ADR-0006 — Canonical Content/State Hashing
+- ADR-0007 — Save Envelope
+- ADR-0008 — Accepted-Command Persistence
+- ADR-0011 — Deterministic Refueling

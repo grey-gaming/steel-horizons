@@ -1,131 +1,313 @@
-|---
-|status: accepted
-|owner: Tech Lead
-|date: 2026-08-04
-|---
+---
+status: accepted
+owner: Tech Lead
+date: 2026-08-04
+---
 
 # ADR-0010: Mining Boundary Behavior
 
 ## Context
 
-Phase 1 requires deterministic mining extraction at stations and belt-density drift for renewable deposits. GDD 12 §Mining establishes the standard rate accumulator for finite deposits and the denominator-specific rational accumulator for belt mining. GDD 5 §Mining Station defines tier-dependent targets and retune mechanics. GDD 14 §The Veil defines belt drift every 1,000 ticks with PRNG-based density updates. GDD 13 defines `MiningTarget`, `ResourceDeposit`, and `Station.mining_targets`.
+Finite deposits are shared by every Mining Station on their body. Renewable belt
+deposits instead store a changing density and are never consumed. Mining targets
+also have independently blocked output buffers and a ten-tick retune state.
 
-Three unresolved specification questions remain:
+These mechanics run in phase 4 under the tick-transaction rule: phases read the
+committed tick-N snapshot and publish only explicit facts/reducers before the
+atomic tick-N+1 commit. Therefore same-phase drift and shared-deposit contention
+cannot rely on one station observing another station's staged writes.
 
-1. **Full-output handling.** When a mining station's output buffer reaches its maximum (`current >= max`), can extraction continue? Does the accumulator advance or stall? What happens to produced units that cannot fit in the buffer?
-
-2. **Finite-deposit exhaustion.** When a finite deposit has fewer units remaining than the accumulator would produce (e.g., 1 unit remaining but the accumulator crosses 1,000 and would produce 3 units), how is extraction capped? What happens to the accumulator remainder?
-
-3. **Extraction/belt-drift order at tick multiples of 1,000.** Belt drift updates current density every 1,000 ticks (GDD 14). Mining extraction uses current density for belt targets. The relative order of drift and extraction on tick 1,000, 2,000, etc. affects deterministic output.
+This ADR defines the serialized target identity, retune timing, buffer boundaries,
+finite-deposit allocation, drift tick boundary, checked arithmetic, and exact
+within-phase facts.
 
 ## Decision
 
-### 1. Full-output handling: extraction stalls when the buffer is full
+### 1. Mining slots and retune state are explicit
 
-When a mining target's output buffer is at capacity (`current >= max`), extraction for that target **produces no units** and the **accumulator is not advanced** for that tick. The mining station's phase-4 processing skips the accumulator addition entirely for that target.
+Each serialized target carries its stable station-local slot:
 
-This means:
-
-- The remainder stays unchanged during blocked ticks.
-- When buffer space opens (`current < max`), extraction resumes on the next tick with the existing remainder.
-- The remainder does not accumulate during blockage, so no "catch-up surge" occurs when space opens.
-- Each target's output buffer is evaluated independently: one target may be blocked while another target on the same station continues extraction.
-- Full-output blockage does not affect retune progress (`retune_ticks_remaining` continues to decrement normally during retune even if extraction is blocked).
-
-**Rationale.** Stalling the accumulator is simpler than allowing unbounded remainder growth during blockage. The deposit retains its unextracted material during blockage (correct for both finite and belt deposits). No overflow-to-salvage path is needed because the buffer is the sole extraction destination and no material is lost. This differs from recipe OutputBlocked (which holds a completed batch) because mining has no batch boundary—it produces one unit at a time from a continuous stream.
-
-**Edge cases.**
-
-- If a target becomes blocked during retune, the retune timer continues. When the retune completes and the target switches to the new resource, the old target's remainder is discarded (see GDD 5: retune "never deletes the prior target's buffer or inventory" — the buffer persists, but the mining target's accumulator is reset).
-- After save/load, the buffer state and remainder are serialized. A loaded save with full buffers resumes correctly without extraction on the first tick.
-
-### 2. Finite-deposit exhaustion: capped extraction with remainder reset
-
-When a finite (non-renewable) deposit has fewer units remaining than the accumulator would produce, extraction proceeds as follows:
-
-1. Compute `produced = remainder / 1000` (from the standard rate accumulator).
-2. Compute `actual_extraction = min(produced, deposit.current)`.
-3. Decrement `deposit.current` by `actual_extraction`.
-4. Transfer `actual_extraction` units to the output buffer (capped by available buffer space; see §1 above).
-5. If `produced > deposit.current` (the deposit was exhausted this tick):
-   - The accumulator remainder is **reset to zero** (`rate_remainder.value = 0`). The excess production potential is lost because the deposit contained insufficient material.
-6. On subsequent ticks, if `deposit.current == 0`:
-   - Extraction is skipped entirely for that target (no accumulator advance, no production). The mining target remains configured but produces nothing.
-
-**Rationale.** Resetting the remainder when the deposit runs out avoids a permanently non-productive accumulator that would grow unboundedly. The lost excess is bounded: at most `(increment - 1)` milli-units of lost remainder per exhaustion event, because the accumulator crosses 1,000 at most once per tick and the excess beyond the deposit's remainder is at most `999 + increment`. This is an intentional design choice: the player must monitor finite deposits and relocate mining when a deposit is near exhaustion. The 999-unit worst-case remainder loss represents <1 unit of material.
-
-**Edge cases.**
-
-- If a finite deposit is exhausted on the same tick that output is full: extraction produces nothing (blocked by §1), and the deposit is not decremented. The accumulator is not advanced. The deposit survives until a tick where buffer space exists. This is correct—material cannot be extracted into a full buffer.
-- If multiple targets extract from the same deposit: this is not possible because each target maps to a distinct `ResourceType` and a deposit holds at most one resource per type per body. The `max_targets` limit per station tier prevents duplicate-target issues.
-
-### 3. Belt drift occurs before extraction on tick multiples of 1,000
-
-On ticks where `tick > 0` and `tick % 1000 == 0`, the belt drift phase executes **before** mining extraction within phase 4. The per-tick order within phase 4 is:
-
-1. **Belt density drift.** For every belt (`renewable: true`) deposit in `celestial_bodies`, update current density in `ResourceType` order (the enum order defined in GDD 13 §ResourceType). For each belt deposit:
-
-   ```
-   range = baseline / 10                        // integer division, floor
-   delta_raw = next_rng_u64() % (2 * range + 1) // [0, 2*range]
-   delta = delta_raw - range                    // [-range, +range]
-   new_density = deposit.current + delta
-   deposit.current = clamp(new_density, baseline * 70 / 100, baseline * 130 / 100)
-   ```
-
-   This matches GDD 14's formula with explicit clamping and ResourceType ordering.
-
-2. **Mining extraction.** For each station's mining targets (in ascending station ID, then target creation order), perform extraction using the updated deposit densities for belt targets and the current deposit amount for finite targets. Extraction follows §1 (full-output handling) and §2 (exhaustion) using the current deposit state.
-
-**Rationale.** Drift-before-extraction means extraction on tick 1000 uses the new density. This is the natural interpretation: the drift event represents a real-time change in belt composition, and mining responds to the new conditions in the same tick. ResourceType ordering provides deterministic drift-event sequencing. Extraction order (station ID then target creation order) matches the simulation's general entity-ordering principle and prevents ordering-dependent state divergence.
-
-**Belt extraction accumulator.** For belt (renewable) targets, the denominator-specific accumulator from GDD 12 is used:
-
-```
-remainder += base_quantity * deposit.current       // u64 addition
-produced = remainder / (cycle_ticks * baseline)    // u64 division
-remainder = remainder % (cycle_ticks * baseline)   // u64 remainder
+```text
+struct MiningTarget {
+  slot_index: u8
+  resource: ResourceType
+  rate_remainder: RationalRemainder
+  retune_ticks_remaining: u16
+}
 ```
 
-Where:
-- `base_quantity` = `StationStats.extraction_per_target_per_10_ticks` (1/2/3/5 for T1–T4)
-- `cycle_ticks` = 10 (the authored per-target cycle length)
-- `baseline` = the deposit's `baseline` field (e.g., 2000 for MetalOre in The Veil)
-- `deposit.current` = the current density after drift (fluctuates 70–130% of baseline)
+`mining_targets` is serialized in ascending `slot_index`. Slot indices are unique,
+must be below the station tier's `max_targets`, and need not be contiguous. A
+station may not configure the same `ResourceType` in two slots; this also gives
+each target one unambiguous resource-keyed output buffer. Across different
+stations, any number of targets may legally share the same body deposit.
 
-This is equivalent to "output multiplied by `current / baseline`" as stated in GDD 14, because:
+For every serialized target, `rate_remainder.denominator` is nonzero and
+`rate_remainder.value < denominator`; the denominator matches the selected
+deposit formula below. `retune_ticks_remaining <= 10`, and a positive retune
+count requires remainder value zero. The matching output buffer and visible body
+deposit must exist. A depleted finite deposit requires remainder value zero on
+every target configured for it. Load validation rejects, rather than normalizes,
+violations of these invariants.
 
+`SetMiningTarget` immediately stores the requested resource, resets the remainder,
+and sets `retune_ticks_remaining` to the authored value 10. The requested deposit
+must exist and be visible at the body's current survey depth. The remainder
+denominator is set to:
+
+- `1_000` for a finite target; or
+- checked `cycle_ticks * deposit.baseline` for a renewable target.
+
+Changing a slot that is already retuning replaces the requested resource and
+restarts the full ten ticks. The prior resource's output buffer and inventory are
+not deleted. Setting a slot to the same resource is still an explicit retune and
+restarts and resets progress; idempotent command IDs prevent accidental duplicate
+application.
+
+If several valid `SetMiningTarget` commands address the same slot at one effective
+tick, command-phase processing applies them in `server_sequence`; the last request
+is the committed target. Phase 4 receives one coalesced `RetuneStarted` fact for
+that slot, counts the application tick once, and performs no extraction. Earlier
+commands are still recorded as applied—their configuration was deterministically
+superseded by a later command in the same transaction.
+
+Retune duration counts simulation ticks, not paused planning transactions:
+
+- A Paused command commits `retune_ticks_remaining = 10`; each of the next ten
+  simulation ticks skips extraction and decrements it once. A tick that observes
+  `1` writes `0` but still does not extract. Extraction first resumes on a later
+  tick that begins with `0`.
+- A Running command applied at the start of a simulation tick emits an explicit
+  `RetuneStarted(station_id, slot_index)` fact. Phase 4 skips extraction for that
+  slot and an explicit retune reducer changes the command-staged value from 10 to
+  9. That application tick is the first of the ten inactive ticks. This named
+  reducer prevents conflicting implicit writes between command application and
+  phase 4.
+
+The remainder is reset when retuning starts, so no production credit transfers
+between resources. Retune countdown runs before output-capacity checks, so a full
+new-resource buffer does not pause the ten-tick retune.
+
+### 2. Common output-capacity rule
+
+For a target that is not retuning, compute:
+
+```text
+available_space = output_buffer.max - output_buffer.current
 ```
-output_per_10_ticks = base_quantity * deposit.current / baseline
-                    = extraction_per_target_per_10_ticks * current_density / baseline_density
+
+with checked subtraction after validating `current <= max`.
+
+If `available_space == 0`, extraction for that target is fully stalled:
+
+- no accumulator increment is added;
+- its fractional remainder is unchanged;
+- a finite deposit is not decremented; and
+- a belt still drifts globally when due, but this target produces nothing.
+
+When space later opens, the target resumes from its saved fractional remainder.
+There is no catch-up for blocked ticks.
+
+If a noncanonical future content definition can produce more whole units in one
+tick than the remaining partial space, only units that fit are materialized. The
+unstoreable whole-unit throughput is discarded for that tick; it never decrements
+a finite deposit and is not retained as whole-unit accumulator credit. The
+fractional remainder below the denominator is retained unless the finite deposit
+is exhausted. This preserves bounded accumulator invariants without deleting
+material.
+
+A full output buffer normally advertises supply above its configured export floor,
+which lets logistics drain it. It does not advertise “no supply”; whether it can
+drain depends on thresholds, reservations, and available Cargo Ships.
+
+### 3. Accumulator step
+
+Every active target computes a checked prospective step before any material
+mutation:
+
+```text
+total = prior_remainder.value + increment
+potential_units = total / prior_remainder.denominator
+fractional_remainder = total % prior_remainder.denominator
 ```
 
-At baseline density (100%), the target produces exactly `base_quantity` units per 10 ticks. At higher densities it produces faster; at lower densities, slower. The denominator `cycle_ticks * baseline` ensures the accumulator's unit is milli-units of `baseline_density` rather than 1000, which is necessary because `current_density / baseline_density` is a rational that need not divide 1000 evenly.
+The denominator must be nonzero and match the target/deposit invariant in §1.
+All addition, multiplication, conversion, and buffer/deposit updates use checked
+integer arithmetic and return typed errors. No production path wraps or panics.
 
-**Belt deposit invariants.** Belt `deposit.current` is never decremented by extraction. It represents density, not a consumable quantity. The `deposit.current` field is re-purposed: for finite deposits it tracks remaining material; for belt deposits it tracks current density (starting at `baseline`). The `renewable` flag distinguishes the two behaviors.
+For finite deposits:
+
+```text
+increment = extraction_per_target_per_10_ticks * 1_000 / 10
+denominator = 1_000
+```
+
+The authored numerator divides exactly; content validation rejects a future value
+that does not. For a renewable belt:
+
+```text
+increment = extraction_per_target_per_10_ticks * effective_density
+denominator = 10 * baseline
+```
+
+This is exactly the authored output multiplied by `current_density / baseline`.
+
+### 4. Finite-deposit extraction and shared contention
+
+Multiple legal targets may draw from one finite `(BodyId, ResourceType)` deposit.
+Phase 4 creates extraction intents from the committed snapshot, then allocates
+them through a named per-deposit reducer.
+
+For every finite deposit, initialize:
+
+```text
+remaining_budget = committed_deposit.current
+```
+
+Eligible intents are processed by ascending Station ID, then ascending serialized
+`slot_index`. For each intent:
+
+1. If it is retuning, depleted, or has zero output space, apply the corresponding
+   skip rule and do not advance its accumulator.
+2. Compute `potential_units` and `fractional_remainder` from §3.
+3. Compute
+   `actual = min(potential_units, available_space, remaining_budget)`.
+4. Add exactly `actual` to the target's output buffer.
+5. Subtract exactly `actual` from `remaining_budget`.
+6. Provisionally store `fractional_remainder` while the deposit budget remains
+   nonzero.
+
+After all intents, stage one aggregate deposit update equal to the final
+`remaining_budget`. If that value is zero, reset the remainder value of every
+target configured for this deposit to zero, including targets processed before
+the exhausting intent. Fractional progress against a nonexistent finite deposit
+cannot survive or transfer to another resource. The sum of all target outputs is
+therefore exactly the deposit decrement and can never exceed the committed amount.
+Later intents see the phase-local budget through the explicit reducer, not through
+staged `GameState`.
+
+Targets reached after the budget becomes zero skip with no accumulator advance.
+A target remains configured after depletion and can be retuned by command.
+
+An intent exhausts the deposit only when `actual` equals its positive budget on
+entry. This covers exact potential and overshoot only when output space can accept
+the remaining material; partial output space cannot falsely exhaust it. On final
+exhaustion all target fractions for the deposit reset as above. Each discarded
+fractional value is strictly less than its denominator; unavailable whole-unit
+throughput was never extracted material.
+
+### 5. Belt drift uses the resulting tick and an immutable fact
+
+For a transaction beginning at committed tick `N`, compute checked:
+
+```text
+resulting_tick = N + 1
+```
+
+Drift occurs when `resulting_tick > 0` and `resulting_tick % 1_000 == 0`. Thus the
+transaction that commits state tick 1,000 performs the first drift, and extraction
+committed at tick 1,000 uses that new density.
+
+Renewable deposits are visited in ascending Body ID, then `ResourceType` enum
+order. Exactly one project-owned PRNG value is consumed per renewable deposit on
+every drift tick, including a deposit whose integer range is zero.
+
+For each deposit, use wide checked arithmetic:
+
+```text
+range = u64(baseline) / 10
+span = checked_add(checked_mul(2, range), 1)
+delta_raw = next_rng_u64() % span
+delta = i128(delta_raw) - i128(range)
+candidate = i128(committed_current) + delta
+minimum = checked_mul(u64(baseline), 70) / 100
+maximum = checked_mul(u64(baseline), 130) / 100
+drifted_density = clamp(candidate, minimum, maximum)
+```
+
+Content validation requires `baseline > 0`, and the checked result must fit the
+serialized `u32` field.
+
+Phase 4 publishes an immutable
+`DriftedDensityFact<(BodyId, ResourceType), u32>` and stages the corresponding
+deposit updates through a named reducer. Belt extraction reads the fact when
+present and otherwise reads committed density. It never reads an implicit staged
+write.
+
+### 6. Renewable extraction
+
+Renewable intents are processed in ascending Station ID and slot index after the
+drift facts are built. Each target applies §§2–3 with the effective density from
+§5. Its actual output is:
+
+```text
+actual = min(potential_units, available_space)
+```
+
+The target stores the fractional remainder. Excess whole-unit throughput above
+available space is discarded for the tick. `ResourceDeposit.current` is never
+decremented by extraction because it is density, not inventory.
+
+Retuning or output blockage affects only the target. Drift still consumes its
+fixed PRNG call and updates the renewable deposit even when no station can extract.
+
+### 7. Phase-4 total order and atomicity
+
+The phase executes these substeps:
+
+1. Compute `resulting_tick` and, when due, all checked drift facts in Body
+   ID/ResourceType order.
+2. Apply retune facts/countdowns in Station ID/slot order.
+3. Build active extraction intents from the committed snapshot plus named retune
+   and drift facts.
+4. Allocate finite intents with per-deposit budgets in Station ID/slot order.
+5. Compute renewable target outputs in Station ID/slot order.
+6. Stage aggregate deposit, buffer, remainder, countdown, RNG, and event changes.
+
+Any overflow, invalid denominator, invalid command-fact reduction, capacity
+violation, or invariant failure aborts the complete tick transaction. No partial
+drift, deposit debit, output credit, remainder update, or PRNG advance commits.
+
+Drift events, if externally emitted, use the same Body ID/ResourceType order.
+Mining-output deltas use Station ID/slot order. Event ordering therefore does not
+depend on map insertion or thread scheduling.
+
+## Required executable proofs
+
+P1-17/P1-26 must cover at least:
+
+- Slot identity and order survive Serde, canonical hashing, save/load, and replay.
+- Duplicate slots/resources and slot indices beyond tier capacity are rejected.
+- New and repeated retunes suppress exactly ten simulation ticks, reset the
+  remainder, and preserve old buffers/inventory.
+- Full buffers do not advance the accumulator or decrement deposits.
+- Partial space with multi-unit potential never removes an unstored finite unit.
+- Exact exhaustion and overshoot both conserve `deposit + outputs`, reset every
+  target fraction for the exhausted deposit, and never underflow; insufficient
+  output space cannot falsely exhaust it.
+- Two or more stations sharing one finite deposit allocate in Station ID/slot
+  order and cannot overdraw it.
+- Tick 999→1,000 drifts before extraction; tick 1,000→1,001 does not drift.
+- A save at tick 999 produces the same tick-1,000 density, PRNG state, output, and
+  events as an uninterrupted/replayed run.
+- Body insertion order cannot change PRNG call order or hashes.
+- Full/retuning belt targets still receive global drift but no output.
+- Quotients greater than one, zero range, checked-product boundaries, and every
+  typed rollback path are exercised.
 
 ## Consequences
 
-### Positive
-
-- Full-output stalling is simple: no catch-up surge, no overflow salvage, no accumulator unbounded growth.
-- Exhaustion with remainder reset is bounded and deterministic: at most 999 + `increment` milli-units lost per exhaustion event.
-- Drift-before-extraction on multiples of 1,000 is deterministic and uses the natural ResourceType ordering.
-- Belt extraction accumulator formula is explicit and matches both GDD 12 and GDD 14 descriptions.
-
-### Negative
-
-- Full-output stalling means a player who fills a mining buffer loses extraction progress until the buffer drains. This is a player-planning concern (configure appropriate export thresholds and Courier logistics), not a simulation invariant.
-- Remainder reset on exhaustion loses <1 unit of potential material per exhaustion event. Over the game's lifespan this is negligible (at most a few dozen events across all finite deposits).
-- Belt drift before extraction means the PRNG is called during phase 4, which is after command application and ship movement. The PRNG state at that point is deterministic given the initial RNG words and the tick number, but care is needed for replay equivalence: the PRNG call count per tick must be stable.
-
-### Mitigations
-
-- The <1-unit loss per exhaustion is bounded and consistent across save/load and replay because the accumulator state is serialized.
-- PRNG call count per tick is fixed: exactly one call per belt deposit per drift tick (7 deposits at tick 1000, no drift between). The drift ticks are at deterministic intervals (1000, 2000, ...), and replay equivalence holds because the same RNG words produce the same drift sequence.
-- Buffer blockage is self-correcting: the export threshold and logistics system naturally drain full buffers. A mining station with a full output buffer will have no supply advertised for that resource, and Cargo Ships will not attempt to pick up from it.
+- No buffer boundary or shared-deposit race can lose or overdraw finite material;
+  renewable output remains the intentional authored source.
+- Stable slot identity removes the prior un-serialized “target creation order.”
+- Retune timing is identical in real-time and explicit batch advancement.
+- Drift-before-extraction is defined against the committed resulting tick and is
+  compatible with immutable transaction phases.
+- Partial output space may waste that tick's available throughput, but never
+  deposit inventory; this is the intentional no-catch-up policy.
 
 ## Related ADRs
 
-- ADR-0006 — Canonical Content/State Hashing (serialized `MiningTarget.rate_remainder` and `ResourceDeposit.current` are included in replay-mode hash)
-- ADR-0007 — Save Envelope Format, Content Hash Placement, and Migration Fixtures (serialized mining state in save files)
+- ADR-0002 — Deterministic Tick Simulation
+- ADR-0006 — Canonical Content/State Hashing
+- ADR-0007 — Save Envelope

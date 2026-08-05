@@ -49,15 +49,38 @@ steel-horizons/
 
 ```rust
 pub struct SimulationActor {
-    state: GameState,
+    lifecycle: GameLifecycle,
+    state: Option<GameState>,
+    loading: Option<LoadingStatus>,
     content: Arc<ContentCatalog>,
     pending_commands: BTreeMap<u64, Vec<SequencedCommand>>,
+    session_receipts: BTreeMap<String, SessionReceipt>,
+    next_session_sequence: u64,
+    next_session_event_sequence: u64,
     event_store: EventStore,
-    snapshot_tx: watch::Sender<Arc<GameSnapshot>>,
+    snapshot_tx: watch::Sender<Option<Arc<GameSnapshot>>>,
+    status_tx: watch::Sender<Arc<ServerStatus>>,
 }
 ```
 
-The actor mailbox accepts `SubmitCommand`, `SchedulerTick`, `GetSnapshot`, and `Shutdown`. Only actor methods receive `&mut GameState`. HTTP/WS tasks wait on oneshot acknowledgements and consume immutable snapshots/events.
+The actor mailbox accepts `SubmitCommand`, `SchedulerTick`, `GetSnapshot`, persistence completions, and `Shutdown`. Only actor methods receive `&mut GameState`.
+`lifecycle`, not state presence, is the observable runtime authority. Unloaded has
+`state = None`; Loading has `loading = Some` and may retain an unmodified prior state
+privately; stable game lifecycles have `state = Some`, `loading = None`, and require
+`state.lifecycle == lifecycle`. Snapshot publication is None in Unloaded/Loading,
+while status remains available in every lifecycle. HTTP/WS tasks wait on oneshot
+acknowledgements and consume immutable status/snapshots/events.
+`session_receipts`/`next_session_sequence` and the event allocator/store implement
+per-process receipt/event continuity across state replacement. Only replayable command
+records and the command/event persisted lower bounds live in `GameState`.
+
+Successful NewGame/LoadAutosave keeps the runtime event store, checked-rebases the
+candidate event lower bound, and publishes ADR-0012's complete replacement delta.
+Fresh-process autoload seeds the allocator and empty-ring retention floor from the
+saved lower bound. The allocator is a positive next-unused value; snapshots/status
+report its checked value minus one, and the exact resumable/410 boundary follows
+ADR-0012. Pre-Ready autoload emits no retained events. Events emitted by later controls
+while Unloaded have a null tick; snapshots remain unavailable until a game exists.
 
 ## Arithmetic Types
 
@@ -195,6 +218,10 @@ Construction, survey, and research-docking queues use their separate determinist
 Component recipes are stored on completed entities as `installed_components`. Cancellation moves reserved/delivered components back to the source. Demolition first enters `Evacuating`; once the station is empty, its Construction Ship returns installed components to the recovery Hub or creates a non-decaying cache at that Hub. Scrapping is valid only at the ship's current Hub, unloads cargo/Fuel first, and returns components to that Hub or Hub-side salvage.
 
 Research Pause never deletes the project or credited value. With `release_unused`, it also changes the current facility buffer entries from research-reserved to ordinary inventory in place; no inventory location changes.
+Reassignment validates the entire target result before mutation, releases every unused
+old-facility reservation in place, preserves only progress/consumed credit/remainders,
+and rebuilds target reservations/demand from physical target stock. It never reuses an
+old reservation at a new station or derives Hub research capability from Hub tier.
 
 ## Content and Invariants
 
@@ -206,7 +233,7 @@ Generated IDs come only from serialized per-kind counters and use `kind_generate
 
 ## Persistence
 
-The actor clones a normalized save snapshot at a commit boundary and sends it to the persistence task. Saves include all rational remainders, reservations, salvage, bottleneck windows, next event sequence, RNG words, and command-log ordering. The event-retention ring, supply/demand tables, and graphical state are rebuilt/reset; stale event cursors receive `ResyncRequired`.
+Dequeuing `SaveNow` is a FIFO barrier: prior mailbox work is complete, the actor clones a normalized immutable snapshot at that committed boundary, and later messages remain ordered while persistence writes. A single FIFO worker serializes every write/read of the autosave target in actor enqueue order; delayed or failed older operations cannot overwrite a newer successful snapshot, and LoadAutosave waits behind prior saves. A command receipt becomes Applied only after its own persistence completion reports successful atomic replacement; failures preserve the prior save. Saves include ADR-0007's exact content/hash metadata plus all rational remainders, reservations, salvage, bottleneck windows, next event sequence, RNG words, and replayable command-log ordering. The runtime event ring remains session-owned across same-process replacement; derived supply/demand tables are rebuilt, and pending schedules/idempotency are validated and rebuilt from saved records.
 
 ## Performance
 

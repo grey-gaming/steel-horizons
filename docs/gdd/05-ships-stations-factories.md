@@ -57,7 +57,7 @@ Stations occupy fixed slots on orbit rings. Every station has installed componen
 
 ### Station Hub
 
-The Hub is the logistics and shipbuilding center. Every tier has one shipyard queue and one slow component-assembly slot; Hub upgrades increase docks/storage rather than parallel build slots. The shipyard queue is a FIFO ordered queue with exactly one active build at a time; pending orders wait in creation sequence order (ADR-0009). It provides:
+The Hub is the logistics and shipbuilding center. Every tier has one shipyard queue and one slow component-assembly slot; Hub upgrades increase docks/storage rather than parallel build slots. The shipyard queue is FIFO with exactly one active order. Only the first order stages local components, accepts Cargo reservations, and advertises its missing manifest; later orders remain resource-neutral until promotion. Completed ships start with zero Fuel and zero Fuel remainders, then use ordinary conservation-safe refueling from a real station compartment (ADR-0009). It provides:
 
 - General cargo storage plus a separate Fuel compartment
 - Ship construction, one ship order at a time
@@ -97,7 +97,9 @@ A Research Station runs one project at a time and always requires a docked Resea
 3. Cargo Ships deliver components through the source Hub dock into BuildOrder staging. When the full manifest is staged, the order becomes Ready.
 4. An idle Construction Ship that can hold the complete manifest takes the Ready order, loads it atomically, and travels to the site.
 5. Build work advances until the authored requirement is met.
-6. The completed station begins in a configured but idle state.
+6. The completed station uses GDD 14's exact empty/default constructor. The moved
+   build hold becomes its installed components, and the Construction Ship becomes
+   Idle at/docked to that station with an empty hold; no Fuel or inventory is created.
 
 No station is placed instantly by an API command.
 

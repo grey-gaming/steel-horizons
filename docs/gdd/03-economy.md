@@ -104,12 +104,12 @@ Ships consume Fuel while moving. Consumption uses actual distance and `base_mass
 Fuel rules:
 
 - Fuel capacity is defined per ship tier in GDD 14.
-- Ships refuel automatically from station fuel compartments.
+- Every empty, unreserved idle ship role below `max_fuel` refuels automatically from unreserved station Fuel before ordinary work. Direct refueling is local consumption and may draw below the Cargo export floor, but never consumes Fuel protected by an `AwaitingPickup` logistics reservation or a production/research hold. Phase 9 uses the phase-8 post-debit fact and subtracts each newly created Cargo Fuel reservation from its local budget.
 - A ship keeps a 10% route reserve and refuses jobs it cannot complete safely.
-- Low-fuel ships prioritize refueling.
+- Refuel reachability uses the exact movement/Fuel calculation, including serialized remainders and Life Support. Final movement Fuel is charged before the dock transaction transfers available stock; a transfer may be partial or zero after Ship-ID-ordered contention.
 - Ships in a dock holding pattern consume no fuel.
 - Hub Haven begins with 200 Fuel.
-- If an empty, unreserved ship has no reachable Fuel, the nearest existing Station Hub's solar rescue tug (route distance, then Hub ID) dispatches after 300 ticks and tows it directly home at half its base speed without consuming ship Fuel. The ship becomes normally docked with zero Fuel and refuels from Hub inventory. The tug cannot carry cargo or contribute to logistics/construction, so it is recovery—not free production supply. Normal job feasibility guarantees a loaded/reserved ship never enters this state.
+- A below-full ship already docked at a Hub waits there if no direct-refuel stock exists. Otherwise an empty, unreserved ship with no reachable Fuel uses the nearest existing Station Hub's solar rescue tug (route distance, then Hub ID) after 300 ticks and is towed directly home at half its base speed without consuming ship Fuel. It docks with exactly its pre-tow Fuel and both remainders unchanged, then retries normal refueling. The tug cannot carry cargo or contribute to logistics/construction, so it is recovery—not free production supply. Normal job feasibility guarantees a loaded/reserved ship never enters this state.
 
 Renewable belt deposits include the inputs for Fuel, so a functioning late-game network cannot permanently exhaust propulsion resources.
 
