@@ -720,7 +720,7 @@ Notes: Independent review delegated. New module: `engine/src/scenario.rs` (595 l
 ```text
 Increment: P1-11
 Date: 2026-08-06
-Commit: (local commit pending)
+Commit: f61fb28
 Requirements: ADR-0004 §Lifecycle State Machine; ADR-0003 §Command/Query API; TDD 00 §Architecture; TDD 02 §API Protocol
 Focused proof: `cargo test --locked` — 303 tests including 18 lifecycle tests (allowed/disallowed transitions, command validation per lifecycle, server status from snapshot/loading/unloaded) and 17 actor tests (unloaded start, new game, failed load, pause/resume, scheduler tick, advance ticks, batch equivalence, snapshot publication, status availability, sequential advance ticks).
 Cumulative gates: `cargo fmt --check` (clean), `cargo build --locked` (clean), `cargo clippy --locked -- -D warnings` (clean), `cargo test --locked` (303/303 pass)
