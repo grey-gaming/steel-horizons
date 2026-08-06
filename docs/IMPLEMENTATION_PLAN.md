@@ -745,7 +745,7 @@ Independent review (codebase-review subagent) found 2 🔴 bugs: idempotency env
 ```text
 Increment: P1-13
 Date: 2026-08-06
-Commit: <pending>
+Commit: 865055c
 Requirements: ADR-0007 §§1–7 (save envelope format, content hash placement, migration fixtures); ADR-0008 §§1–7 (accepted-command persistence, SaveNow barrier, load rebuild rules, command-log invariants); ADR-0006 §§5–7 (canonical hashing); GDD 12 §Save, Load, and Replay; GDD 13 §Lifecycle, RNG, Commands, and Root State
 Focused proof: `cargo test --lib` — 332 tests including 10 persistence tests (save_envelope_canonical_tick_zero, envelope_json_has_correct_fields, save_normalizes_running_to_paused, save_normalizes_advancing_to_paused, save_preserves_won, content_hash_mismatch_rejected, state_hash_mismatch_rejected, save_load_round_trip, atomic_write_round_trip, migration_registration)
 Cumulative gates: `cargo fmt --check` (clean), `cargo build --lib` (clean), `cargo clippy --lib -- -D warnings` (clean), `cargo test --lib` (332/332 pass)
