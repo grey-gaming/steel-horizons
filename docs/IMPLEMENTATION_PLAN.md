@@ -684,7 +684,7 @@ Notes: Independent review completed via delegated subagent (deleg_7af3a41c). All
 ```text
 Increment: P1-08
 Date: 2026-08-06
-Commit: 65749ba
+Commit: e16fe49
 Requirements: GDD 13 §Lifecycle, RNG, Commands, and Root State; GDD 13 §Identifiers and Resources (generated ID prefixes); GDD 14 §Starting State; ADR-0006 §Domain separation prefixes
 Focused proof: `cargo test --locked` — 246 tests including 15 state_construct tests (canonical tick-zero construction, Hub/Builder fields, entity counts, lifecycle validation, invariants pass, all-zero RNG detection, dock mismatch detection, buffer overflow detection, sparse map detection, IdCounter consistency, Serde round trip, counter overflow safety) and 4 state_hash tests (golden hash match, determinism, state-change sensitivity, insertion-order independence).
 Cumulative gates: `cargo fmt` (clean), `cargo build --locked` (clean), `cargo clippy --locked -- -D warnings` (clean), `cargo test --locked` (246/246 pass)
