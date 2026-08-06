@@ -708,7 +708,7 @@ Notes: Independent review completed via delegated subagent (deleg_46234a87). All
 ```text
 Increment: P1-10
 Date: 2026-08-06
-Commit: <pending>
+Commit: e0979f1
 Requirements: ADR-0002 §Deterministic Tick Simulation, §Execution Modes; GDD 12 §Tick and Time Modes, §Tick Transaction and Phase Order; TDD 01 §Simulation Engine
 Focused proof: `cargo test --locked` — 274 tests including 16 scenario harness tests (construction, tick advancement, equivalence proof, assertion helpers, command_at placeholder, from_state constructor, golden hash match). Core proof: `tick_by_tick_vs_batch_equivalence` and `tick_by_tick_vs_batch_event_trace_equivalence` — both verify that repeated calls to ordinary `advance_one_tick` and harness batch `advance_until` produce identical state hashes and event traces.
 Cumulative gates: `cargo fmt --check` (clean), `cargo build --locked` (clean), `cargo clippy --locked -- -D warnings` (clean), `cargo test --locked` (274/274 pass)
