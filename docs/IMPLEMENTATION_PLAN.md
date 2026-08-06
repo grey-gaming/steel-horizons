@@ -660,11 +660,11 @@ Notes: Independent review completed via delegated subagent (deleg_ef6a4342). All
 ```text
 Increment: P1-06
 Date: 2026-08-06
-Commit: bd648df
+Commit: b6d74da
 Requirements: GDD 12 §Integer Numeric Representation (Standard Rate Accumulator, Denominator-Specific Rational Accumulator, Fuel Accumulator); TDD 01 §Arithmetic Types; ADR-0002 §Numeric Rules
 Focused proof: `cargo test --locked` — 186 tests covering MilliRemainder (new/invariant, exact rate, accumulation, non-exact rate, overflow, zero-cycle, overflow increment), consume_tick (exact project, remainder bounds, large remainder, zero total ticks, overflow), consume_fuel (no discount, with discount, partial tick, with payload, efficiency accumulation, overflow mass, overflow distance), MilliDistance (checked add, overflow add, checked sub, underflow sub), MilliSpeed (checked mul ratio, zero denominator, with payload, zero capacity), plus property tests for exact cycles, exact consumptions, and fuel conservation.
 Cumulative gates: `cargo fmt` (clean), `cargo build --locked` (clean), `cargo clippy --locked -- -D warnings` (clean), `cargo test --locked` (186/186 pass)
 Scenarios activated: none (arithmetic-kernel-only increment)
 Golden/hash changes: none
-Notes: Independent review completed via delegated subagent (deleg_3f0961e8). All checks passed with no issues found. New module: `engine/src/arithmetic.rs` with 720 lines containing MilliRemainder, consume_tick, consume_fuel, MilliDistance, MilliSpeed, ArithmeticError, RateError, and 27 focused tests. Rustfmt-formatting changes to canonical.rs, content_hash.rs, and content_validate.rs are cosmetic only (no logic change).
+Notes: Independent review completed via delegated subagent (deleg_3f0961e8). All checks passed. One review finding: added Serialize/Deserialize derives with #[serde(transparent)] to MilliRemainder, MilliDistance, MilliSpeed newtypes to prevent build break when serialization lands in P1-08. New module: `engine/src/arithmetic.rs` with 720 lines containing MilliRemainder, consume_tick, consume_fuel, MilliDistance, MilliSpeed, ArithmeticError, RateError, and 27 focused tests. Rustfmt-formatting changes to canonical.rs, content_hash.rs, and content_validate.rs are cosmetic only (no logic change).
 ```
