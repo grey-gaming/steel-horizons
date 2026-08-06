@@ -383,11 +383,9 @@ mod tests {
     use std::path::PathBuf;
 
     fn load_json<T: serde::de::DeserializeOwned>(path: &str) -> T {
-        let content_dir = PathBuf::from(
-            std::env::var("CARGO_MANIFEST_DIR")
-                .map(|p| PathBuf::from(p).parent().unwrap().join("content"))
-                .unwrap_or_else(|_| PathBuf::from("content")),
-        );
+        let content_dir = std::env::var("CARGO_MANIFEST_DIR")
+            .map(|p| PathBuf::from(p).parent().unwrap().join("content"))
+            .unwrap_or_else(|_| PathBuf::from("content"));
         let full_path = content_dir.join(path);
         let data = std::fs::read_to_string(&full_path)
             .unwrap_or_else(|e| panic!("Cannot read {}: {}", full_path.display(), e));

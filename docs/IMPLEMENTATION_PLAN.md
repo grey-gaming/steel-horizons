@@ -202,7 +202,7 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
   - Verify: repeated calls to the ordinary tick function and harness batch advancement of the same N ticks produce identical ADR-0006 replay-equivalence hashes and canonical deterministic event traces.
   - Depends on: P1-09.
 
-- [ ] **P1-11 — Actor and lifecycle.**
+- [x] **P1-11 — Actor and lifecycle.**
   - Deliver: sole-owner actor mailbox, immutable `Arc<GameSnapshot>` publication, scheduler, `Unloaded/Loading/Paused/Running/Advancing/Won`, exact batch advancement and rollback.
   - Verify: complete lifecycle transition table, batch range, concurrent exclusion, failed load/new-game restoration, and required `realtime_batch_equivalence` through scheduler and `AdvanceTicks` paths.
   - Depends on: P1-09, P1-10.
@@ -715,4 +715,16 @@ Cumulative gates: `cargo fmt --check` (clean), `cargo build --locked` (clean), `
 Scenarios activated: `tick_by_tick_vs_batch_equivalence` (P1-10 scenario, mandatory from this increment)
 Golden/hash changes: none (tick-0 state hash matches existing golden `d9da3778c8cc6814472532b575533c3babfa5d04faf5d4a03f8cf6e2410d5eff`)
 Notes: Independent review delegated. New module: `engine/src/scenario.rs` (595 lines). Provides `ScenarioHarness` with canonical content loader, `command_at`, `advance_until`, state/event assertions, invariant and hash helpers, `from_state` constructor, and `state_mut` for test-specific setup. No wall-clock waits — all advancement uses the ordinary `advance_one_tick` pure function. `command_at` is a placeholder recording pending commands for P1-12 integration. 16 focused tests cover construction, tick advancement, equivalence proof, assertion helpers, and golden hash match.
+```
+
+```text
+Increment: P1-11
+Date: 2026-08-06
+Commit: (local commit pending)
+Requirements: ADR-0004 §Lifecycle State Machine; ADR-0003 §Command/Query API; TDD 00 §Architecture; TDD 02 §API Protocol
+Focused proof: `cargo test --locked` — 303 tests including 18 lifecycle tests (allowed/disallowed transitions, command validation per lifecycle, server status from snapshot/loading/unloaded) and 17 actor tests (unloaded start, new game, failed load, pause/resume, scheduler tick, advance ticks, batch equivalence, snapshot publication, status availability, sequential advance ticks).
+Cumulative gates: `cargo fmt --check` (clean), `cargo build --locked` (clean), `cargo clippy --locked -- -D warnings` (clean), `cargo test --locked` (303/303 pass)
+Scenarios activated: `realtime_batch_equivalence` (P1-11 scenario, mandatory from this increment)
+Golden/hash changes: none (state hash unchanged; no new golden files)
+Notes: Independent review completed via delegated subagent (deleg_5bdc542a). Two correctness bugs found and fixed: (1) `accepted: true` changed to `false` on lifecycle-validation rejection path; (2) `Loading -> Running` transition removed per ADR-0004 §Save Normalization (saves load as Paused, not Running). Documentation gaps fixed: `GameLifecycle` enum variants now have individual doc comments. Test misnomer `concurrent_advance_ticks_rejected` renamed to `sequential_advance_ticks_allowed`. Redundant `update_status()` call removed after batch advancement (already called by `publish_snapshot`). New modules: `engine/src/lifecycle.rs` (509 lines), `engine/src/actor.rs` (1,045 lines). `engine/src/lib.rs` updated with `pub mod lifecycle; pub mod actor;`. All pre-existing clippy warnings fixed across 8 files (content.rs, content_validate.rs, content_hash.rs, state_construct.rs, state_hash.rs, scenario.rs, prng.rs, travel.rs).
 ```

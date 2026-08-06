@@ -325,7 +325,7 @@ mod tests {
         assert_eq!(seg.total_distance_milli, 600_000); // |1200-600| * 1000
         assert_eq!(seg.speed_multiplier_num, 1);
         assert_eq!(seg.speed_multiplier_den, 2);
-        assert_eq!(seg.life_support_eligible, false);
+        assert!(!seg.life_support_eligible);
         assert!(seg.arc_direction.is_none());
     }
 
@@ -342,7 +342,7 @@ mod tests {
         assert_eq!(seg.total_distance_milli, 1570 * 1200); // angular diff * radius
         assert_eq!(seg.speed_multiplier_num, 1);
         assert_eq!(seg.speed_multiplier_den, 1);
-        assert_eq!(seg.life_support_eligible, false);
+        assert!(!seg.life_support_eligible);
         assert!(seg.arc_direction.is_some());
     }
 
@@ -367,7 +367,7 @@ mod tests {
         assert_eq!(arc.total_distance_milli, 1570 * 1200);
         assert_eq!(arc.speed_multiplier_num, 1);
         assert_eq!(arc.speed_multiplier_den, 1);
-        assert_eq!(arc.life_support_eligible, false);
+        assert!(!arc.life_support_eligible);
     }
 
     #[test]

@@ -80,11 +80,9 @@ mod tests {
     use std::path::PathBuf;
 
     fn load_json<T: serde::de::DeserializeOwned>(path: &str) -> T {
-        let content_dir = PathBuf::from(
-            std::env::var("CARGO_MANIFEST_DIR")
-                .map(|p| PathBuf::from(p).parent().unwrap().join("content"))
-                .unwrap_or_else(|_| PathBuf::from("content")),
-        );
+        let content_dir = std::env::var("CARGO_MANIFEST_DIR")
+            .map(|p| PathBuf::from(p).parent().unwrap().join("content"))
+            .unwrap_or_else(|_| PathBuf::from("content"));
         let full_path = content_dir.join(path);
         let data = std::fs::read_to_string(&full_path)
             .unwrap_or_else(|e| panic!("Cannot read {}: {}", full_path.display(), e));
@@ -110,12 +108,10 @@ mod tests {
         let hash_str = format_state_hash(&hash);
 
         // Check against golden file
-        let golden_path = PathBuf::from(
-            std::env::var("CARGO_MANIFEST_DIR")
-                .map(|p| PathBuf::from(p).parent().unwrap().join("tests/goldens"))
-                .unwrap_or_else(|_| PathBuf::from("tests/goldens")),
-        )
-        .join("state_hash.txt");
+        let golden_path = std::env::var("CARGO_MANIFEST_DIR")
+            .map(|p| PathBuf::from(p).parent().unwrap().join("tests/goldens"))
+            .unwrap_or_else(|_| PathBuf::from("tests/goldens"))
+            .join("state_hash.txt");
         let golden = std::fs::read_to_string(&golden_path)
             .unwrap_or_else(|e| panic!("Cannot read golden file {}: {}", golden_path.display(), e));
         let golden = golden.trim();

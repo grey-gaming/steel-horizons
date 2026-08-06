@@ -515,12 +515,10 @@ mod tests {
         let harness = ScenarioHarness::new().unwrap();
         let hash = harness.state_hash_hex();
 
-        let golden_path = PathBuf::from(
-            std::env::var("CARGO_MANIFEST_DIR")
-                .map(|p| PathBuf::from(p).parent().unwrap().join("tests/goldens"))
-                .unwrap_or_else(|_| PathBuf::from("tests/goldens")),
-        )
-        .join("state_hash.txt");
+        let golden_path = std::env::var("CARGO_MANIFEST_DIR")
+            .map(|p| PathBuf::from(p).parent().unwrap().join("tests/goldens"))
+            .unwrap_or_else(|_| PathBuf::from("tests/goldens"))
+            .join("state_hash.txt");
         let golden = std::fs::read_to_string(&golden_path)
             .unwrap_or_else(|e| panic!("Cannot read golden file {}: {}", golden_path.display(), e));
         let golden = golden.trim();

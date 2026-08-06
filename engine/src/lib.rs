@@ -58,5 +58,11 @@ pub mod state_hash;
 /// Deterministic scenario harness for integration testing.
 pub mod scenario;
 
+/// Lifecycle state machine and runtime status types.
+pub mod lifecycle;
+
+/// Simulation actor — sole mutable GameState owner.
+pub mod actor;
+
 /// Convenience re-export of the engine version.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

@@ -136,11 +136,17 @@ pub enum LaneId {
 )]
 #[serde(rename_all = "camelCase")]
 pub enum GameLifecycle {
+    /// No game is loaded; actor has no mutable state.
     Unloaded,
+    /// A load or new-game operation is in progress; state is not yet available.
     Loading,
+    /// Game is loaded but paused; commands and batch ticks are accepted.
     Paused,
+    /// Game is running with real-time scheduler ticks; commands and pause are accepted.
     Running,
+    /// A batch of ticks is being advanced; no commands or scheduler ticks are accepted.
     Advancing,
+    /// Gate victory has been achieved; no further mutation is possible.
     Won,
 }
 

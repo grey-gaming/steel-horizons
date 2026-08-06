@@ -144,6 +144,7 @@ mod tests {
     #[test]
     fn golden_vectors() {
         let mut prng = Prng::new([1, 2, 3, 4]).unwrap();
+        #[allow(clippy::needless_range_loop)]
         for i in 0..10 {
             let output = prng.next_u64();
             assert_eq!(
@@ -172,7 +173,7 @@ mod tests {
         let mut prng = Prng::new([42, 0, 0, 1]).unwrap();
         for _ in 0..100 {
             let v = prng.next_u64_range(10, 20);
-            assert!(v >= 10 && v <= 20, "value {v} outside [10, 20]");
+            assert!((10..=20).contains(&v), "value {v} outside [10, 20]");
         }
     }
 
