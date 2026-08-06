@@ -672,7 +672,7 @@ Notes: Independent review completed via delegated subagent (deleg_3f0961e8). All
 ```text
 Increment: P1-07
 Date: 2026-08-06
-Commit: <pending>
+Commit: 0281039
 Requirements: GDD 12 §Deterministic Travel, §Save, Load, and Replay (xoshiro256**); ADR-0002 §Numeric Rules, §Randomness; TDD 01 §Travel Geometry
 Focused proof: `cargo test --locked` — 227 tests including 8 PRNG tests (golden vectors, split, range, serde, all-zero invalid, deterministic sequence, divergent seeds) and 37 travel geometry tests (angular diff, wrap, abs diff, lane multipliers, radial/arc/combined/zero routes, life support eligibility, effective speed with payload/research/overflow, serde round-trip, arc direction consistency, radius-1000 scale, 6283 boundary).
 Cumulative gates: `cargo fmt --check` (clean), `cargo build --locked` (clean), `cargo clippy --locked -- -D warnings` (clean), `cargo test --locked` (227/227 pass)
