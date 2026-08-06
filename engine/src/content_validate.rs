@@ -1958,7 +1958,9 @@ mod tests {
         let scenario: StartingScenario = load_json("starting_system.v1.json");
         let errors = validate_content(&defs, &scenario);
         assert!(
-            errors.iter().any(|e| e.message.contains("prerequisite cycle")),
+            errors
+                .iter()
+                .any(|e| e.message.contains("prerequisite cycle")),
             "expected prerequisite cycle error, got: {:?}",
             errors
         );
@@ -1972,7 +1974,9 @@ mod tests {
         let scenario: StartingScenario = load_json("starting_system.v1.json");
         let errors = validate_content(&defs, &scenario);
         assert!(
-            errors.iter().any(|e| e.message.contains("unknown required tech")),
+            errors
+                .iter()
+                .any(|e| e.message.contains("unknown required tech")),
             "expected unknown required tech error, got: {:?}",
             errors
         );
@@ -1989,7 +1993,11 @@ mod tests {
             .position(|r| r.id.0.starts_with("disassemble_"));
         if let Some(idx) = dis_idx {
             // Clone the outputs first to avoid borrow conflict
-            let first_output = defs.recipes[idx].outputs.iter().next().map(|(&k, &v)| (k, v));
+            let first_output = defs.recipes[idx]
+                .outputs
+                .iter()
+                .next()
+                .map(|(&k, &v)| (k, v));
             if let Some((k, v)) = first_output {
                 defs.recipes[idx].outputs.insert(k, v.saturating_add(1));
             }
@@ -1997,7 +2005,9 @@ mod tests {
         let scenario: StartingScenario = load_json("starting_system.v1.json");
         let errors = validate_content(&defs, &scenario);
         assert!(
-            errors.iter().any(|e| e.message.contains("disassembly") && e.message.contains("don't match")),
+            errors
+                .iter()
+                .any(|e| e.message.contains("disassembly") && e.message.contains("don't match")),
             "expected inverse recipe mismatch error, got: {:?}",
             errors
         );
@@ -2007,7 +2017,11 @@ mod tests {
     #[test]
     fn invalid_zero_quantity_component_cost() {
         let mut defs: DefinitionsCatalog = load_json("definitions.v1.json");
-        let first_cost = defs.ships[0].component_cost.iter().next().map(|(&k, &v)| (k, v));
+        let first_cost = defs.ships[0]
+            .component_cost
+            .iter()
+            .next()
+            .map(|(&k, &v)| (k, v));
         if let Some((res, _)) = first_cost {
             defs.ships[0].component_cost.insert(res, 0);
         }
@@ -2034,7 +2048,9 @@ mod tests {
         let scenario: StartingScenario = load_json("starting_system.v1.json");
         let errors = validate_content(&defs, &scenario);
         assert!(
-            errors.iter().any(|e| e.message.contains("build_cargo_capacity") && e.message.contains("exceeds")),
+            errors.iter().any(
+                |e| e.message.contains("build_cargo_capacity") && e.message.contains("exceeds")
+            ),
             "expected build_hold exceeds cargo error, got: {:?}",
             errors
         );
@@ -2048,14 +2064,17 @@ mod tests {
         for tech in &mut defs.technologies {
             if tech.costs.contains_key(&ResourceType::RareEarthMinerals) {
                 let cost = tech.costs.get(&ResourceType::RareEarthMinerals).unwrap();
-                tech.costs.insert(ResourceType::RareEarthMinerals, cost + 10_000);
+                tech.costs
+                    .insert(ResourceType::RareEarthMinerals, cost + 10_000);
                 break;
             }
         }
         let scenario: StartingScenario = load_json("starting_system.v1.json");
         let errors = validate_content(&defs, &scenario);
         assert!(
-            errors.iter().any(|e| e.message.contains("RareEarthMinerals") && e.message.contains("budget")),
+            errors
+                .iter()
+                .any(|e| e.message.contains("RareEarthMinerals") && e.message.contains("budget")),
             "expected critical resource budget error, got: {:?}",
             errors
         );

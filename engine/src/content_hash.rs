@@ -60,8 +60,8 @@ pub fn compute_content_hash(catalog: &ContentCatalog) -> ContentHashResult {
     });
 
     // Canonical JSON bytes
-    let canonical_bytes = to_canonical_bytes(&input_value)
-        .map_err(|e| ContentHashError::Canonical(e.to_string()))?;
+    let canonical_bytes =
+        to_canonical_bytes(&input_value).map_err(|e| ContentHashError::Canonical(e.to_string()))?;
 
     // Domain-prefixed hash
     let mut hasher = Sha256::new();
@@ -125,7 +125,8 @@ mod tests {
             .unwrap_or_else(|e| panic!("Cannot read golden file {}: {}", golden_path.display(), e));
         let golden = golden.trim();
         assert_eq!(
-            hash_str, golden,
+            hash_str,
+            golden,
             "content hash does not match golden at {}",
             golden_path.display()
         );
@@ -160,7 +161,10 @@ mod tests {
         let mut modified = catalog.clone();
         modified.definitions.recipes[0].id = RecipeId("modified".into());
         let new_hash = compute_content_hash(&modified).unwrap();
-        assert_ne!(original, new_hash, "hash must change when definitions change");
+        assert_ne!(
+            original, new_hash,
+            "hash must change when definitions change"
+        );
     }
 
     /// Content hash changes when starting scenario changes.

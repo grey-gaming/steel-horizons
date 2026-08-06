@@ -281,10 +281,7 @@ mod tests {
     fn scalars() {
         let value = json!([null, true, false]);
         let bytes = to_canonical_bytes(&value).unwrap();
-        assert_eq!(
-            String::from_utf8_lossy(&bytes),
-            r#"[null,true,false]"#,
-        );
+        assert_eq!(String::from_utf8_lossy(&bytes), r#"[null,true,false]"#,);
     }
 
     /// Empty collections.
@@ -371,6 +368,9 @@ mod tests {
         });
         let b1 = to_canonical_bytes(&v1).unwrap();
         let b2 = to_canonical_bytes(&v2).unwrap();
-        assert_eq!(b1, b2, "canonical bytes must be independent of key insertion order");
+        assert_eq!(
+            b1, b2,
+            "canonical bytes must be independent of key insertion order"
+        );
     }
 }

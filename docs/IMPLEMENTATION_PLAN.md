@@ -177,7 +177,7 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
   - Verify: cycle/unreachable/budget/inverse negative fixtures and stable content-hash golden. Executable bootstrap validation is added in P1-19 when the simulation exists.
   - Depends on: G0-02, P1-04.
 
-- [ ] **P1-06 — Exact arithmetic kernel.**
+- [x] **P1-06 — Exact arithmetic kernel.**
   - Deliver: standard milli accumulator, denominator-specific rational accumulator, Fuel and Life Support accumulators, scale newtypes, and checked arithmetic errors.
   - Verify: canonical examples, quotient greater than one, exact project completion, remainder bounds, overflow/property tests.
   - Depends on: P1-02a.
@@ -655,4 +655,16 @@ Cumulative gates: `cargo clippy` (clean), `cargo build` (clean), `cargo test --l
 Scenarios activated: none (validation-only increment)
 Golden/hash changes: `tests/goldens/content_hash.txt` — new golden for content hash `667407ea914272134aa9495b46c527191ec0e6987a6e410e6f18597413474972`
 Notes: Independent review completed via delegated subagent (deleg_ef6a4342). All 10 review points confirmed passing with no issues. New modules: `engine/src/canonical.rs` (canonical JSON v1 writer), `engine/src/content_hash.rs` (SHA-256 content hash with domain separation). New semantic validators added to `content_validate.rs`: tech DAG cycle detection, required tech reachability, inverse-recipe equality, zero-cost component checks, build hold vs cargo capacity, and critical-resource budget. Construction ships exempted from build-hold check (zero cargo capacity by design). sha2 dependency added to Cargo.toml.
+```
+
+```text
+Increment: P1-06
+Date: 2026-08-06
+Commit: bd648df
+Requirements: GDD 12 §Integer Numeric Representation (Standard Rate Accumulator, Denominator-Specific Rational Accumulator, Fuel Accumulator); TDD 01 §Arithmetic Types; ADR-0002 §Numeric Rules
+Focused proof: `cargo test --locked` — 186 tests covering MilliRemainder (new/invariant, exact rate, accumulation, non-exact rate, overflow, zero-cycle, overflow increment), consume_tick (exact project, remainder bounds, large remainder, zero total ticks, overflow), consume_fuel (no discount, with discount, partial tick, with payload, efficiency accumulation, overflow mass, overflow distance), MilliDistance (checked add, overflow add, checked sub, underflow sub), MilliSpeed (checked mul ratio, zero denominator, with payload, zero capacity), plus property tests for exact cycles, exact consumptions, and fuel conservation.
+Cumulative gates: `cargo fmt` (clean), `cargo build --locked` (clean), `cargo clippy --locked -- -D warnings` (clean), `cargo test --locked` (186/186 pass)
+Scenarios activated: none (arithmetic-kernel-only increment)
+Golden/hash changes: none
+Notes: Independent review completed via delegated subagent (deleg_3f0961e8). All checks passed with no issues found. New module: `engine/src/arithmetic.rs` with 720 lines containing MilliRemainder, consume_tick, consume_fuel, MilliDistance, MilliSpeed, ArithmeticError, RateError, and 27 focused tests. Rustfmt-formatting changes to canonical.rs, content_hash.rs, and content_validate.rs are cosmetic only (no logic change).
 ```
