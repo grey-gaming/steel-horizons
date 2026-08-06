@@ -49,5 +49,11 @@ pub mod canonical;
 /// Content hash computation — ADR-0006 canonical content digest.
 pub mod content_hash;
 
+/// Canonical tick-zero constructor and cheap invariant checker.
+pub mod state_construct;
+
+/// State hash computation — ADR-0006 canonical state digest.
+pub mod state_hash;
+
 /// Convenience re-export of the engine version.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

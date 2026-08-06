@@ -187,7 +187,7 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
   - Verify: PRNG golden vectors, radial/arc/combined/zero routes, 6,283 boundary, Research zero-capacity branch, checked-product boundaries.
   - Depends on: P1-06.
 
-- [ ] **P1-08 — Root state and canonical starting state.**
+- [x] **P1-08 — Root state and canonical starting state.**
   - Deliver: canonical tick-zero constructor from the explicit scenario mapping, generated counters/names, cheap invariant checker, canonical state projection and hash over the P1-02b DTOs.
   - Verify: exact tick-zero snapshot/hash, complete Hub/Builder fields, Serde round trip, malformed-state negatives, insertion-order independence, exact generated prefixes/next-unused formatting, checked overflow, rollback non-consumption, committed non-reuse, and save/replay counter continuity.
   - Depends on: G0-02, P1-02b, P1-03, P1-06, P1-07.
@@ -679,4 +679,16 @@ Cumulative gates: `cargo fmt --check` (clean), `cargo build --locked` (clean), `
 Scenarios activated: none (PRNG-and-travel-geometry-only increment)
 Golden/hash changes: none
 Notes: Independent review completed via delegated subagent (deleg_7af3a41c). All checks passed with no issues. Golden vectors independently verified against Python reference implementation. New modules: `engine/src/prng.rs` (xoshiro256** with 8 tests) and `engine/src/travel.rs` (angular_diff, TravelPlan::between, effective_speed, lane multipliers, 37 tests). `engine/src/lib.rs` updated with `pub mod travel`. TravelPlan::between constructs zero-, one-, or two-segment routes; radial burn uses 1/2 speed multiplier; lane arc uses destination-lane multiplier; life support eligibility for Outer/Fringe lanes; payload factor via checked_with_payload.
+```
+
+```text
+Increment: P1-08
+Date: 2026-08-06
+Commit: 65749ba
+Requirements: GDD 13 §Lifecycle, RNG, Commands, and Root State; GDD 13 §Identifiers and Resources (generated ID prefixes); GDD 14 §Starting State; ADR-0006 §Domain separation prefixes
+Focused proof: `cargo test --locked` — 246 tests including 15 state_construct tests (canonical tick-zero construction, Hub/Builder fields, entity counts, lifecycle validation, invariants pass, all-zero RNG detection, dock mismatch detection, buffer overflow detection, sparse map detection, IdCounter consistency, Serde round trip, counter overflow safety) and 4 state_hash tests (golden hash match, determinism, state-change sensitivity, insertion-order independence).
+Cumulative gates: `cargo fmt` (clean), `cargo build --locked` (clean), `cargo clippy --locked -- -D warnings` (clean), `cargo test --locked` (246/246 pass)
+Scenarios activated: none (constructor-and-invariants-only increment)
+Golden/hash changes: `tests/goldens/state_hash.txt` created — `d9da3778c8cc6814472532b575533c3babfa5d04faf5d4a03f8cf6e2410d5eff`
+Notes: Independent review completed via delegated subagent (deleg_6c895178). All checks passed with no issues found. New modules: `engine/src/state_construct.rs` (canonical tick-zero constructor + cheap invariant checker with 15 tests) and `engine/src/state_hash.rs` (canonical state hash with 4 tests and golden file). `engine/src/lib.rs` updated with `pub mod state_construct` and `pub mod state_hash`. The constructor maps every StartingScenario field into GameState at tick 0, preserving authored IDs and display names; empty collections for runtime-only maps. The invariant checker validates RNG state, fuel remainders, dock consistency, buffer bounds, sparse BTreeMap values, gate build, and IdCounters. The state hash uses the same ADR-0006 domain-separation pattern as content_hash.rs.
 ```
