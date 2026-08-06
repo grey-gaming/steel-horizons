@@ -15,6 +15,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::command::SequencedCommand;
 use crate::id::{BodyId, ShipId, StationId};
 use crate::state::*;
 use crate::types::*;
@@ -60,6 +61,8 @@ pub struct CommittedTick {
     pub tick: u64,
     /// Number of events emitted during this tick.
     pub event_count: u32,
+    /// The full post-commit game state.
+    pub state: GameState,
 }
 
 // ─── Tick facts ───────────────────────────────────────────────────────
@@ -171,6 +174,8 @@ pub struct TickTransaction<'a> {
     events: Vec<TickEvent>,
     /// Whether the transaction has been committed (prevents double-commit).
     committed: bool,
+    /// Scheduled commands to apply during phase 1.
+    pending_commands: Vec<SequencedCommand>,
 }
 
 impl<'a> TickTransaction<'a> {
@@ -186,7 +191,13 @@ impl<'a> TickTransaction<'a> {
             facts: TickFacts::default(),
             events: Vec::new(),
             committed: false,
+            pending_commands: Vec::new(),
         }
+    }
+
+    /// Set scheduled commands for phase 1 to apply.
+    pub fn set_pending_commands(&mut self, commands: Vec<SequencedCommand>) {
+        self.pending_commands = commands;
     }
 
     /// Register a reducer for a field key, allowing multi-phase writes.
@@ -276,13 +287,57 @@ impl<'a> TickTransaction<'a> {
         // Clone the state and apply pending changes.
         let mut new_state = self.state.clone();
 
-        // Apply root-level changes.
-        // Note: tick advancement is handled by the caller after commit.
-        // Root changes are applied by field name.
-        // For now, since phases are stubs, there are no root changes to apply.
-        // Real phases will set specific root fields via write_root().
+        // Apply root-level changes by field name.
+        for (key, value) in &self.root_changes {
+            match key.as_str() {
+                "lifecycle" => {
+                    if let Some(v) = value {
+                        new_state.lifecycle =
+                            serde_json::from_str(v).unwrap_or(GameLifecycle::Paused);
+                    }
+                }
+                "tick" => {
+                    if let Some(v) = value {
+                        if let Ok(n) = v.parse::<u64>() {
+                            new_state.tick = n;
+                        }
+                    }
+                }
+                _ => {
+                    // Unknown root fields are silently ignored (future-proofing).
+                }
+            }
+        }
 
-        // Apply entity-level changes — for now none since phases are stubs.
+        // Apply entity-level changes (full entity replacements).
+        // Key format: "collection:{id}" -> Some(Some(json)) replaces the entity.
+        for (key, value) in &self.entity_field_changes {
+            // `value` is `&Option<String>`.  Some(json_str) yields the
+            // inner `&String` which is the serialized entity JSON.
+            if let Some(ref json_str) = value {
+                // Parse the entity key: "stations:{id}", "ships:{id}", etc.
+                if let Some((collection, id_str)) = key.split_once(':') {
+                    let id_str = id_str.trim_start_matches('{').trim_end_matches('}');
+                    match collection {
+                        "stations" => {
+                            if let Ok(station) = serde_json::from_str::<Station>(json_str) {
+                                new_state
+                                    .stations
+                                    .insert(StationId(id_str.to_string()), station);
+                            }
+                        }
+                        "ships" => {
+                            if let Ok(ship) = serde_json::from_str::<Ship>(json_str) {
+                                new_state.ships.insert(ShipId(id_str.to_string()), ship);
+                            }
+                        }
+                        _ => {
+                            // Other entity collections silently ignored.
+                        }
+                    }
+                }
+            }
+        }
 
         // Advance tick counter.
         new_state.tick = self.tick + 1;
@@ -290,12 +345,10 @@ impl<'a> TickTransaction<'a> {
         // Collect events.
         let event_count = self.events.len() as u32;
 
-        // Emit events (placeholder — real event emission happens in P1-31).
-        // For now we just return the count.
-
         Ok(CommittedTick {
             tick: new_state.tick,
             event_count,
+            state: new_state,
         })
     }
 }
@@ -304,10 +357,107 @@ impl<'a> TickTransaction<'a> {
 
 /// Phase 1: Apply scheduled commands.
 ///
-/// Empty stub — filled in by P1-12.
+/// Processes pending commands in server_sequence order.  Each command is
+/// validated for expected_tick, then applied to the tick transaction.
+/// Commands that target a future tick or are control-only are already
+/// handled by the actor — this phase handles replayable gameplay commands
+/// that were queued during Running.
 pub fn phase_apply_scheduled_commands<'a>(
-    _tx: &mut TickTransaction<'a>,
+    tx: &mut TickTransaction<'a>,
 ) -> Result<(), SimulationError> {
+    let commands = std::mem::take(&mut tx.pending_commands);
+    if commands.is_empty() {
+        return Ok(());
+    }
+
+    // Sort by server_sequence for deterministic ordering.
+    let mut sorted = commands;
+    sorted.sort_by_key(|a| a.server_sequence);
+
+    for sequenced in sorted {
+        let envelope = sequenced.envelope;
+
+        // Validate expected_tick (must match current tick if set).
+        if let Some(expected) = envelope.expected_tick {
+            if expected != tx.tick {
+                return Err(SimulationError::Phase(format!(
+                    "expected_tick {} does not match current tick {}",
+                    expected, tx.tick
+                )));
+            }
+        }
+
+        // Apply the command to the transaction — match only the variants
+        // that exist in the current Command enum.  Commands whose fields
+        // are not yet wired are silently accepted as placeholders.
+        match &envelope.command {
+            crate::command::Command::SetStationPriority {
+                station_id,
+                priority,
+            } => {
+                let key = format!("stations:{}.priority", station_id.0.as_str());
+                tx.write_root(&key, Some(priority.to_string()))?;
+            }
+            crate::command::Command::ConfigureBuffer {
+                station_id,
+                configuration,
+            } => {
+                let json = serde_json::to_string(configuration)
+                    .map_err(|e| SimulationError::Phase(format!("serialize: {}", e)))?;
+                let key = format!("stations:{}.buffer_config", station_id.0.as_str());
+                tx.write_root(&key, Some(json))?;
+            }
+            crate::command::Command::SetProductionRecipe {
+                station_id,
+                slot_index,
+                recipe_id,
+            } => {
+                let key = format!("stations:{}.recipes.{}", station_id.0.as_str(), slot_index);
+                let value = match recipe_id {
+                    Some(ref rid) => rid.0.as_str().to_string(),
+                    None => "null".to_string(),
+                };
+                tx.write_root(&key, Some(value))?;
+            }
+            crate::command::Command::SetMiningTarget {
+                station_id,
+                slot_index,
+                resource,
+            } => {
+                let key = format!("stations:{}.mining.{}", station_id.0.as_str(), slot_index);
+                let value = format!("{:?}", resource);
+                tx.write_root(&key, Some(value))?;
+            }
+            // Build/upgrade/demolish/scrap/gate commands — placeholders
+            crate::command::Command::QueueBuildShip { .. }
+            | crate::command::Command::QueueBuildStation { .. }
+            | crate::command::Command::QueueUpgrade { .. }
+            | crate::command::Command::CancelBuildOrder { .. }
+            | crate::command::Command::QueueDemolishStation { .. }
+            | crate::command::Command::ScrapShip { .. }
+            | crate::command::Command::BeginGateAssembly { .. } => {
+                // Placeholder — real effects in P1-15 through P1-25.
+            }
+            // Research commands — placeholders
+            crate::command::Command::QueueResearch { .. }
+            | crate::command::Command::PauseResearch { .. } => {
+                // Placeholder — real effects in P1-20.
+            }
+            // Survey commands — placeholders
+            crate::command::Command::QueueSurvey { .. }
+            | crate::command::Command::CancelSurveyOrder { .. } => {
+                // Placeholder — real effects in P1-21.
+            }
+            _ => {
+                // Control commands should not reach this phase.
+                return Err(SimulationError::Phase(format!(
+                    "unexpected command in scheduled phase: {}",
+                    envelope.id
+                )));
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -403,9 +553,10 @@ pub fn phase_check_victory<'a>(_tx: &mut TickTransaction<'a>) -> Result<(), Simu
 /// 9. Logistics table rebuild and deterministic job assignment
 /// 10. Bottleneck monitoring
 /// 11. Victory check, atomic commit, and event emission
-pub fn advance_one_tick(state: &GameState) -> TickResult {
+pub fn advance_one_tick(state: &GameState, pending: Vec<SequencedCommand>) -> TickResult {
     let tick = state.tick;
     let mut tx = TickTransaction::new(tick, state);
+    tx.set_pending_commands(pending);
 
     // Register reducers for fields that legitimately need multi-phase writes.
     // Fuel is written by phase 8 (debit) and phase 9 (refuel assignment).
@@ -579,8 +730,10 @@ mod tests {
     #[test]
     fn single_noop_tick_advances() {
         let state = paused_state_at_tick0();
-        let result = advance_one_tick(&state).unwrap();
+        let result = advance_one_tick(&state, vec![]).unwrap();
         assert_eq!(result.tick, 1);
+        // State should be preserved
+        assert_eq!(result.state.tick, 1);
     }
 
     /// Ten consecutive no-op ticks advance tick from 0 to 10.
@@ -588,11 +741,11 @@ mod tests {
     fn ten_noop_ticks_advance() {
         let mut state = paused_state_at_tick0();
         for i in 0..10 {
-            let result = advance_one_tick(&state).unwrap();
+            let result = advance_one_tick(&state, vec![]).unwrap();
             assert_eq!(result.tick, i + 1, "tick {} should advance to {}", i, i + 1);
             assert_eq!(result.event_count, 0, "no events in no-op tick");
-            // Update state tick for next iteration (simulating commit effect)
-            state.tick = result.tick;
+            // Use the returned state for the next tick
+            state = result.state;
         }
         assert_eq!(state.tick, 10);
     }
@@ -633,7 +786,7 @@ mod tests {
             words: [0, 0, 0, 0],
         };
 
-        let result = advance_one_tick(&bad_state);
+        let result = advance_one_tick(&bad_state, vec![]);
         match result {
             Err(SimulationError::Invariant(violations)) => {
                 assert!(!violations.is_empty());

@@ -146,6 +146,124 @@ pub enum ReplayableGameCommand {
 
 // ─── Full command union ───────────────────────────────────────────────
 
+impl From<&Command> for ReplayableGameCommand {
+    fn from(cmd: &Command) -> Self {
+        match cmd {
+            Command::QueueBuildShip { hub_id, role, tier } => {
+                ReplayableGameCommand::QueueBuildShip {
+                    hub_id: hub_id.clone(),
+                    role: *role,
+                    tier: *tier,
+                }
+            }
+            Command::QueueBuildStation {
+                source_hub_id,
+                body_id,
+                orbit_ring,
+                slot,
+                station_type,
+                tier,
+            } => ReplayableGameCommand::QueueBuildStation {
+                source_hub_id: source_hub_id.clone(),
+                body_id: body_id.clone(),
+                orbit_ring: *orbit_ring,
+                slot: *slot,
+                station_type: *station_type,
+                tier: *tier,
+            },
+            Command::QueueUpgrade {
+                source_hub_id,
+                station_id,
+                target_tier,
+            } => ReplayableGameCommand::QueueUpgrade {
+                source_hub_id: source_hub_id.clone(),
+                station_id: station_id.clone(),
+                target_tier: *target_tier,
+            },
+            Command::CancelBuildOrder { order_id } => ReplayableGameCommand::CancelBuildOrder {
+                order_id: order_id.clone(),
+            },
+            Command::QueueDemolishStation {
+                station_id,
+                recovery_hub_id,
+            } => ReplayableGameCommand::QueueDemolishStation {
+                station_id: station_id.clone(),
+                recovery_hub_id: recovery_hub_id.clone(),
+            },
+            Command::ScrapShip { ship_id } => ReplayableGameCommand::ScrapShip {
+                ship_id: ship_id.clone(),
+            },
+            Command::BeginGateAssembly { fabricator_ship_id } => {
+                ReplayableGameCommand::BeginGateAssembly {
+                    fabricator_ship_id: fabricator_ship_id.clone(),
+                }
+            }
+            Command::SetStationPriority {
+                station_id,
+                priority,
+            } => ReplayableGameCommand::SetStationPriority {
+                station_id: station_id.clone(),
+                priority: *priority,
+            },
+            Command::ConfigureBuffer {
+                station_id,
+                configuration,
+            } => ReplayableGameCommand::ConfigureBuffer {
+                station_id: station_id.clone(),
+                configuration: configuration.clone(),
+            },
+            Command::SetProductionRecipe {
+                station_id,
+                slot_index,
+                recipe_id,
+            } => ReplayableGameCommand::SetProductionRecipe {
+                station_id: station_id.clone(),
+                slot_index: *slot_index,
+                recipe_id: recipe_id.clone(),
+            },
+            Command::SetMiningTarget {
+                station_id,
+                slot_index,
+                resource,
+            } => ReplayableGameCommand::SetMiningTarget {
+                station_id: station_id.clone(),
+                slot_index: *slot_index,
+                resource: *resource,
+            },
+            Command::QueueResearch {
+                facility_id,
+                tech_id,
+            } => ReplayableGameCommand::QueueResearch {
+                facility_id: facility_id.clone(),
+                tech_id: tech_id.clone(),
+            },
+            Command::PauseResearch {
+                tech_id,
+                release_unused,
+            } => ReplayableGameCommand::PauseResearch {
+                tech_id: tech_id.clone(),
+                release_unused: *release_unused,
+            },
+            Command::QueueSurvey {
+                body_id,
+                target_depth,
+                priority,
+            } => ReplayableGameCommand::QueueSurvey {
+                body_id: body_id.clone(),
+                target_depth: *target_depth,
+                priority: *priority,
+            },
+            Command::CancelSurveyOrder { order_id } => ReplayableGameCommand::CancelSurveyOrder {
+                order_id: order_id.clone(),
+            },
+            // Non-replayable commands should never reach this conversion.
+            // An `unreachable!()` ensures a new control variant is caught
+            // immediately rather than silently producing a misleading record.
+            _ => unreachable!("non-replayable command reached ReplayableGameCommand::from"),
+        }
+    }
+}
+
 /// The complete command union (actor controls + replayable game commands).
 #[derive(
     Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
@@ -278,6 +396,18 @@ pub enum CommandStatus {
     Applied,
     Rejected,
     Failed,
+}
+
+/// A command that has been assigned a server sequence number.
+///
+/// Sequenced commands are queued for tick-level application.  The
+/// server sequence ensures deterministic ordering within a tick.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SequencedCommand {
+    /// The server-assigned sequence number.
+    pub server_sequence: u64,
+    /// The command envelope.
+    pub envelope: CommandEnvelope,
 }
 
 #[cfg(test)]

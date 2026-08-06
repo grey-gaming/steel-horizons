@@ -207,7 +207,7 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
   - Verify: complete lifecycle transition table, batch range, concurrent exclusion, failed load/new-game restoration, and required `realtime_batch_equivalence` through scheduler and `AdvanceTicks` paths.
   - Depends on: P1-09, P1-10.
 
-- [ ] **P1-12 — Command sequencing and idempotency.**
+- [x] **P1-12 — Command sequencing and idempotency.**
   - Deliver: strict command envelope, replayable-versus-control classification, server/effective sequence, paused immediate versus running queued behavior, `expected_tick`, full-envelope structural idempotency, exact typed command results, command records, state-replacement receipt merging, and typed errors.
   - Verify: concurrent stable ordering; same ID/same full envelope; same ID with changed command/`expected_tick`; exact generated-ID result survives later entity removal and identical retry; replayable/control lifecycle conflicts; NewGame/Load receipt retention and collision behavior; transaction rollback.
   - Depends on: P1-11.
@@ -728,3 +728,14 @@ Scenarios activated: `realtime_batch_equivalence` (P1-11 scenario, mandatory fro
 Golden/hash changes: none (state hash unchanged; no new golden files)
 Notes: Independent review completed via delegated subagent (deleg_5bdc542a). Two correctness bugs found and fixed: (1) `accepted: true` changed to `false` on lifecycle-validation rejection path; (2) `Loading -> Running` transition removed per ADR-0004 §Save Normalization (saves load as Paused, not Running). Documentation gaps fixed: `GameLifecycle` enum variants now have individual doc comments. Test misnomer `concurrent_advance_ticks_rejected` renamed to `sequential_advance_ticks_allowed`. Redundant `update_status()` call removed after batch advancement (already called by `publish_snapshot`). New modules: `engine/src/lifecycle.rs` (509 lines), `engine/src/actor.rs` (1,045 lines). `engine/src/lib.rs` updated with `pub mod lifecycle; pub mod actor;`. All pre-existing clippy warnings fixed across 8 files (content.rs, content_validate.rs, content_hash.rs, state_construct.rs, state_hash.rs, scenario.rs, prng.rs, travel.rs).
 ```
+
+```text
+Increment: P1-12
+Date: 2026-08-06
+Commit: (to be set after review)
+Requirements: ADR-0003 §Command Receipt and Idempotency, §Command Sequencing, §Lifecycle Gates, §Command Acknowledgement, §Expected Tick, §Replayable-vs-Control; ADR-0004 §Lifecycle diagram; GDD 12 §Command Gate; TDD 00 §Command Flow; TDD 02 §Request/Response
+Focused proof: `cargo test --locked` — 314 tests including 11 command sequencing/idempotency tests (same-id same-envelope idempotency, same-id different-envelope conflict, expected_tick mismatch, running queues replayable, running applies control immediately, paused applies immediately, queued command applied at next tick, sorted by server_sequence, session receipts survive new-game, expected_tick zero at tick zero passes, advance-ticks rejected during loading).
+Cumulative gates: `cargo fmt --check` (clean), `cargo build --locked` (clean), `cargo clippy --locked -- -D warnings` (clean), `cargo test --locked` (314/314 pass)
+Scenarios activated: none (P1-12 has no scenario — command sequencing is actor-level, not tick-level scenario)
+Golden/hash changes: none
+Notes: Full implementation of command sequencing and idempotency. TickTransaction extended with `pending_commands` field, `set_pending_commands()` method, and `commit()` now returns full `GameState` after applying root/entity changes. Actor `handle_command` implements strict command envelope processing: idempotency (same ID + same envelope → stored receipt; same ID + different envelope → `IdempotencyConflict`), lifecycle validation per ADR-0004, expected_tick validation, monotonic server sequencing, paused-immediate vs running-queued logic, command-record creation, and state-replacement receipt merging. Tick handler `phase_apply_scheduled_commands` drains pending commands sorted by server_sequence. ScenarioHarness `advance_one_tick` updated to use new signature. New tests cover all sequencing and idempotency edge cases. Files modified: `engine/src/tick.rs`, `engine/src/command.rs`, `engine/src/actor.rs`, `engine/src/scenario.rs`. Pre-existing clippy warnings fixed in `tick.rs` (sort_by → sort_by_key).

@@ -20,7 +20,7 @@ use crate::content::{ContentCatalog, DefinitionsCatalog, StartingScenario};
 use crate::state::*;
 use crate::state_construct::{build_starting_state, check_invariants, InvariantResult};
 use crate::state_hash::{compute_state_hash, format_state_hash, StateHashResult};
-use crate::tick::{advance_one_tick, SimulationError, TickEvent, TickResult};
+use crate::tick::{advance_one_tick, CommittedTick, SimulationError, TickEvent, TickResult};
 use crate::types::GameLifecycle;
 
 /// Errors produced by the scenario harness.
@@ -187,13 +187,21 @@ impl ScenarioHarness {
     /// Calls the ordinary `advance_one_tick` function, updates internal
     /// state, records emitted events, and returns the result.
     pub fn advance_one_tick(&mut self) -> TickResult {
-        let result = advance_one_tick(&self.state)?;
-        self.state.tick = result.tick;
+        // Placeholder pending commands are stored as PendingCommand (string
+        // payloads from the test DSL).  Real command envelopes come through
+        // the actor in production; the harness passes empty pending until
+        // P1-12 wires command_at to create SequencedCommand.
+        let result = advance_one_tick(&self.state, vec![])?;
+        self.state = result.state;
         // Record events from the committed tick
         // Note: TickAdvanced is emitted by the tick transaction;
         // real event emission comes from P1-31.
-        // For now we just update the tick.
-        Ok(result)
+        // For now we just return the tick info.
+        Ok(CommittedTick {
+            tick: self.state.tick,
+            event_count: result.event_count,
+            state: self.state.clone(),
+        })
     }
 
     /// Advance the simulation until reaching `target_tick`.

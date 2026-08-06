@@ -19,6 +19,7 @@ use tokio::sync::{mpsc, oneshot, watch};
 use crate::command::CommandAcknowledgement;
 use crate::command::CommandEnvelope;
 use crate::command::CommandStatus;
+use crate::command::ReplayableGameCommand;
 use crate::content::ContentCatalog;
 use crate::lifecycle::*;
 use crate::state::*;
@@ -132,16 +133,17 @@ pub struct SimulationActor {
     shutdown_requested: bool,
 }
 
-/// A command sequenced at a specific tick.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SequencedCommand {
-    /// The server-assigned sequence number.
-    pub server_sequence: u64,
-    /// The command envelope.
-    pub envelope: CommandEnvelope,
-}
+pub use crate::command::SequencedCommand;
 
 /// A session receipt for idempotency tracking.
+///
+/// The `envelope_hash` field stores a structural fingerprint of the full
+/// incoming `CommandEnvelope` (including the `command` body and
+/// `expected_tick`).  When a later command arrives with the same id, the
+/// implementation compares the fresh hash against the stored hash to
+/// distinguish full-envelope idempotency (same id + same envelope →
+/// stored receipt) from idempotency conflict (same id + different
+/// envelope → `IdempotencyConflict`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SessionReceipt {
     /// The client-provided command id.
@@ -158,6 +160,8 @@ pub struct SessionReceipt {
     pub result: Option<CommandResult>,
     /// The rejection details, if rejected.
     pub error: Option<CommandRejection>,
+    /// Structural fingerprint of the full envelope for idempotency.
+    envelope_hash: u64,
 }
 
 /// A stored event (placeholder — full event store in P1-31).
@@ -275,11 +279,17 @@ impl SimulationActor {
 
     /// Handle a submitted command envelope.
     ///
-    /// This is a placeholder implementation that validates lifecycle and
-    /// returns a basic acknowledgement.  Full command processing lands in
-    /// P1-12.
+    /// Implements full command sequencing and idempotency:
+    /// - Validates lifecycle for command type
+    /// - Validates expected_tick (if set, must match current tick)
+    /// - Checks idempotency: same ID + same full envelope → return stored receipt
+    /// - Same ID + different envelope → IdempotencyConflict rejection
+    /// - Classifies as replayable or control
+    /// - In Running: queues replayable commands for next tick, applies controls immediately
+    /// - In Paused: applies all commands immediately
+    /// - Records session receipt and CommandRecord in command_log
     fn handle_command(&mut self, envelope: CommandEnvelope) -> CommandAcknowledgement {
-        // Extract the command type string for lifecycle validation.
+        // ── 1. Extract command type for lifecycle validation ────────────
         let command_type = match &envelope.command {
             crate::command::Command::NewGame { .. } => "NewGame",
             crate::command::Command::LoadAutosave => "LoadAutosave",
@@ -290,7 +300,7 @@ impl SimulationActor {
             _ => "Gameplay",
         };
 
-        // Validate lifecycle for this command type.
+        // ── 2. Validate lifecycle for this command type ────────────────
         if let Err(e) = validate_command_for_lifecycle(self.lifecycle, command_type) {
             let msg = format!("{}", e);
             return CommandAcknowledgement {
@@ -311,75 +321,268 @@ impl SimulationActor {
             };
         }
 
-        // Assign server sequence and record receipt.
-        let seq = self.next_session_sequence;
-        self.next_session_sequence += 1;
+        // ── 3. Idempotency check ──────────────────────────────────────
+        if let Some(existing) = self.session_receipts.get(&envelope.id) {
+            // Compute a structural hash of the incoming envelope.
+            use std::hash::{Hash, Hasher};
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            envelope.hash(&mut hasher);
+            let incoming_hash = hasher.finish();
 
-        // Handle lifecycle-changing commands.
-        match &envelope.command {
-            crate::command::Command::NewGame { .. } => {
-                // Placeholder — real implementation in P1-12.
-                self.lifecycle = GameLifecycle::Loading;
-                self.loading = Some(LoadingStatus {
-                    operation: LoadingOperation::NewGame,
-                    stage: LoadingStage::ValidatingContent,
-                });
-                // In a real implementation, this would construct state
-                // and transition to Paused.  For now we leave it in Loading.
-                self.update_status();
-            }
-            crate::command::Command::LoadAutosave => {
-                self.lifecycle = GameLifecycle::Loading;
-                self.loading = Some(LoadingStatus {
-                    operation: LoadingOperation::LoadAutosave,
-                    stage: LoadingStage::ReadingSave,
-                });
-                self.update_status();
-            }
-            crate::command::Command::Pause => {
-                if self.lifecycle == GameLifecycle::Running {
-                    self.lifecycle = GameLifecycle::Paused;
-                    if let Some(ref mut state) = self.state {
-                        state.lifecycle = GameLifecycle::Paused;
-                    }
-                    self.update_status();
-                }
-            }
-            crate::command::Command::Resume => {
-                if self.lifecycle == GameLifecycle::Paused {
-                    self.lifecycle = GameLifecycle::Running;
-                    if let Some(ref mut state) = self.state {
-                        state.lifecycle = GameLifecycle::Running;
-                    }
-                    self.update_status();
-                }
-            }
-            crate::command::Command::AdvanceTicks { count } => {
-                // AdvanceTicks is handled separately via the mailbox message.
-                // This path is for when AdvanceTicks is submitted as a command
-                // envelope — it should be forwarded to batch advancement.
-                let _ = count;
-                // Placeholder: transition to Advancing then back to Paused.
-                self.lifecycle = GameLifecycle::Advancing;
-                self.update_status();
-            }
-            _ => {
-                // Gameplay commands while Paused or Running.
-                // Placeholder — real processing in P1-12.
+            if incoming_hash == existing.envelope_hash {
+                // Idempotency hit — return the stored receipt.
+                return CommandAcknowledgement {
+                    protocol_version: "v1".to_string(),
+                    id: envelope.id.clone(),
+                    accepted: existing.status != CommandStatus::Rejected,
+                    status: existing.status,
+                    effective_tick: existing.effective_tick,
+                    resulting_tick: existing.resulting_tick,
+                    server_sequence: existing.server_sequence,
+                    game_state: self.lifecycle,
+                    result: existing.result.clone(),
+                    error: existing.error.clone(),
+                };
+            } else {
+                // Same ID but different envelope — conflict.
+                return CommandAcknowledgement {
+                    protocol_version: "v1".to_string(),
+                    id: envelope.id,
+                    accepted: false,
+                    status: CommandStatus::Rejected,
+                    effective_tick: None,
+                    resulting_tick: None,
+                    server_sequence: self.next_session_sequence,
+                    game_state: self.lifecycle,
+                    result: None,
+                    error: Some(CommandRejection {
+                        code: "IdempotencyConflict".to_string(),
+                        message: "command id already used with a different envelope".to_string(),
+                        details: BTreeMap::new(),
+                    }),
+                };
             }
         }
 
+        // ── 4. Validate expected_tick ─────────────────────────────────
+        // If no GameState exists, expected_tick cannot be validated.
+        if envelope.expected_tick.is_some() && self.state.is_none() {
+            return CommandAcknowledgement {
+                protocol_version: "v1".to_string(),
+                id: envelope.id,
+                accepted: false,
+                status: CommandStatus::Rejected,
+                effective_tick: None,
+                resulting_tick: None,
+                server_sequence: self.next_session_sequence,
+                game_state: self.lifecycle,
+                result: None,
+                error: Some(CommandRejection {
+                    code: "ExpectedTickUnavailable".to_string(),
+                    message: "cannot validate expected_tick: no game state loaded".to_string(),
+                    details: BTreeMap::new(),
+                }),
+            };
+        }
+        let current_tick = self.state.as_ref().map_or(0, |s| s.tick);
+        if let Some(expected) = envelope.expected_tick {
+            if expected != current_tick {
+                return CommandAcknowledgement {
+                    protocol_version: "v1".to_string(),
+                    id: envelope.id,
+                    accepted: false,
+                    status: CommandStatus::Rejected,
+                    effective_tick: None,
+                    resulting_tick: None,
+                    server_sequence: self.next_session_sequence,
+                    game_state: self.lifecycle,
+                    result: None,
+                    error: Some(CommandRejection {
+                        code: "ExpectedTickMismatch".to_string(),
+                        message: format!(
+                            "expected tick {} does not match current tick {}",
+                            expected, current_tick
+                        ),
+                        details: BTreeMap::new(),
+                    }),
+                };
+            }
+        }
+
+        // ── 5. Classify as replayable vs control ──────────────────────
+        let is_control = matches!(
+            &envelope.command,
+            crate::command::Command::Pause
+                | crate::command::Command::Resume
+                | crate::command::Command::NewGame { .. }
+                | crate::command::Command::LoadAutosave
+                | crate::command::Command::SaveNow
+                | crate::command::Command::AdvanceTicks { .. }
+        );
+
+        // ── 6. Assign server sequence ─────────────────────────────────
+        let seq = self.next_session_sequence;
+        self.next_session_sequence += 1;
+
+        // ── 7. Determine effective behavior based on lifecycle ─────────
+        let effective_tick: Option<u64>;
+        let mut resulting_tick: Option<u64>;
+        let status: CommandStatus;
+        let result: Option<CommandResult>;
+        let error: Option<CommandRejection>;
+
+        // Control commands are allowed from any lifecycle (they've already
+        // passed step 2's per-command validation).  Gameplay commands are
+        // restricted to Running and Paused.
+        if is_control {
+            // Control commands apply immediately.
+            effective_tick = Some(current_tick);
+            status = CommandStatus::Applied;
+            resulting_tick = None;
+            result = None;
+            error = None;
+        } else {
+            match self.lifecycle {
+                GameLifecycle::Running => {
+                    // Replayable commands queue for the next tick.
+                    let next_tick = current_tick + 1;
+                    self.pending_commands
+                        .entry(next_tick)
+                        .or_default()
+                        .push(SequencedCommand {
+                            server_sequence: seq,
+                            envelope: envelope.clone(),
+                        });
+                    effective_tick = Some(next_tick);
+                    resulting_tick = None;
+                    status = CommandStatus::Accepted;
+                    result = None;
+                    error = None;
+                }
+                GameLifecycle::Paused => {
+                    // All commands apply immediately when paused.
+                    effective_tick = Some(current_tick);
+                    status = CommandStatus::Applied;
+                    resulting_tick = None;
+                    result = None;
+                    error = None;
+                }
+                _ => {
+                    // Other lifecycle states reject gameplay commands.
+                    effective_tick = None;
+                    resulting_tick = None;
+                    status = CommandStatus::Rejected;
+                    result = None;
+                    error = Some(CommandRejection {
+                        code: "InvalidLifecycle".to_string(),
+                        message: format!(
+                            "cannot process commands in {:?} lifecycle",
+                            self.lifecycle
+                        ),
+                        details: BTreeMap::new(),
+                    });
+                }
+            }
+        }
+
+        // ── 8. Apply immediate commands (control or paused) ───────────
+        let is_immediate = is_control || self.lifecycle == GameLifecycle::Paused;
+
+        if is_immediate && status != CommandStatus::Rejected {
+            match &envelope.command {
+                crate::command::Command::NewGame { .. } => {
+                    self.lifecycle = GameLifecycle::Loading;
+                    self.loading = Some(LoadingStatus {
+                        operation: LoadingOperation::NewGame,
+                        stage: LoadingStage::ValidatingContent,
+                    });
+                    self.update_status();
+                }
+                crate::command::Command::LoadAutosave => {
+                    self.lifecycle = GameLifecycle::Loading;
+                    self.loading = Some(LoadingStatus {
+                        operation: LoadingOperation::LoadAutosave,
+                        stage: LoadingStage::ReadingSave,
+                    });
+                    self.update_status();
+                }
+                crate::command::Command::Pause => {
+                    if self.lifecycle == GameLifecycle::Running {
+                        self.lifecycle = GameLifecycle::Paused;
+                        if let Some(ref mut state) = self.state {
+                            state.lifecycle = GameLifecycle::Paused;
+                        }
+                        self.update_status();
+                    }
+                }
+                crate::command::Command::Resume => {
+                    if self.lifecycle == GameLifecycle::Paused {
+                        self.lifecycle = GameLifecycle::Running;
+                        if let Some(ref mut state) = self.state {
+                            state.lifecycle = GameLifecycle::Running;
+                        }
+                        self.update_status();
+                    }
+                }
+                crate::command::Command::AdvanceTicks { count } => {
+                    let _ = count;
+                    self.lifecycle = GameLifecycle::Advancing;
+                    self.update_status();
+                }
+                _ => {
+                    // Gameplay commands while Paused — apply to state immediately.
+                    if let Some(ref mut state) = self.state {
+                        // Build a ReplayableGameCommand from the envelope.
+                        let game_command = ReplayableGameCommand::from(&envelope.command);
+                        state.command_log.push(CommandRecord {
+                            id: envelope.id.clone(),
+                            expected_tick: envelope.expected_tick,
+                            effective_tick: current_tick,
+                            server_sequence: seq,
+                            application_boundary: CommandApplicationBoundary::PausedImmediate,
+                            command: game_command,
+                            outcome: CommandOutcome::Applied,
+                            result: None,
+                            rejection: None,
+                        });
+                    }
+                }
+            }
+
+            resulting_tick = Some(self.state.as_ref().map_or(current_tick, |s| s.tick));
+        }
+
+        // ── 9. Record session receipt ─────────────────────────────────
+        // Compute envelope hash for idempotency before consuming
+        // `envelope` (it is moved below for `id`).
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        envelope.hash(&mut hasher);
+        let env_hash = hasher.finish();
+        let receipt = SessionReceipt {
+            id: envelope.id.clone(),
+            server_sequence: seq,
+            status,
+            effective_tick,
+            resulting_tick,
+            result: result.clone(),
+            error: error.clone(),
+            envelope_hash: env_hash,
+        };
+        self.session_receipts.insert(envelope.id.clone(), receipt);
+
+        // ── 10. Build and return acknowledgement ──────────────────────
         CommandAcknowledgement {
             protocol_version: "v1".to_string(),
             id: envelope.id,
-            accepted: true,
-            status: CommandStatus::Accepted,
-            effective_tick: Some(self.state.as_ref().map_or(0, |s| s.tick)),
-            resulting_tick: None,
+            accepted: status != CommandStatus::Rejected,
+            status,
+            effective_tick,
+            resulting_tick,
             server_sequence: seq,
             game_state: self.lifecycle,
-            result: None,
-            error: None,
+            result,
+            error,
         }
     }
 
@@ -394,9 +597,12 @@ impl SimulationActor {
             return;
         }
         if let Some(ref mut state) = self.state {
-            match advance_one_tick(state) {
+            let current_tick = state.tick;
+            let next_tick = current_tick + 1;
+            let pending = self.pending_commands.remove(&next_tick).unwrap_or_default();
+            match advance_one_tick(state, pending) {
                 Ok(committed) => {
-                    state.tick = committed.tick;
+                    *state = committed.state;
                     self.publish_snapshot();
                 }
                 Err(_e) => {
@@ -444,9 +650,12 @@ impl SimulationActor {
 
         for _ in 0..max_ticks {
             if let Some(ref mut state) = self.state {
-                match advance_one_tick(state) {
+                let current_tick = state.tick;
+                let next_tick = current_tick + 1;
+                let pending = self.pending_commands.remove(&next_tick).unwrap_or_default();
+                match advance_one_tick(state, pending) {
                     Ok(committed) => {
-                        state.tick = committed.tick;
+                        *state = committed.state;
                         ticks_advanced += 1;
                     }
                     Err(e) => {
@@ -631,7 +840,7 @@ mod tests {
                 scenario_id: ScenarioId("starting_system".into()),
             },
         });
-        assert_eq!(result.status, CommandStatus::Accepted);
+        assert_eq!(result.status, CommandStatus::Applied);
         assert_eq!(actor.lifecycle, GameLifecycle::Loading);
         assert!(actor.loading.is_some());
     }
@@ -647,7 +856,7 @@ mod tests {
             expected_tick: None,
             command: Command::Pause,
         });
-        assert_eq!(result.status, CommandStatus::Accepted);
+        assert_eq!(result.status, CommandStatus::Applied);
         assert_eq!(actor.lifecycle, GameLifecycle::Paused);
     }
 
@@ -662,7 +871,7 @@ mod tests {
             expected_tick: None,
             command: Command::Resume,
         });
-        assert_eq!(result.status, CommandStatus::Accepted);
+        assert_eq!(result.status, CommandStatus::Applied);
         assert_eq!(actor.lifecycle, GameLifecycle::Running);
     }
 
@@ -1005,6 +1214,328 @@ mod tests {
             hash_rt, hash_batch,
             "realtime (scheduler ticks) and batch (AdvanceTicks) must produce identical hashes"
         );
+    }
+
+    // ─── Command sequencing and idempotency tests ────────────────────
+
+    /// A replayable command while Running is Accepted and queued for
+    /// the next tick.
+    #[test]
+    fn running_queues_replayable_command() {
+        let (mut actor, _) = test_actor();
+        actor.lifecycle = GameLifecycle::Running;
+        actor.state = Some(paused_state_at_tick0());
+        let result = actor.handle_command(CommandEnvelope {
+            id: "cmd_g1".to_string(),
+            expected_tick: None,
+            command: Command::SetStationPriority {
+                station_id: StationId("hub_haven".into()),
+                priority: 5,
+            },
+        });
+        assert_eq!(result.status, CommandStatus::Accepted);
+        assert_eq!(result.effective_tick, Some(1));
+        assert!(actor.pending_commands.contains_key(&1));
+    }
+
+    /// A control command while Running is Applied immediately.
+    #[test]
+    fn running_applies_control_immediately() {
+        let (mut actor, _) = test_actor();
+        actor.lifecycle = GameLifecycle::Running;
+        actor.state = Some(paused_state_at_tick0());
+        let result = actor.handle_command(CommandEnvelope {
+            id: "cmd_g2".to_string(),
+            expected_tick: None,
+            command: Command::Pause,
+        });
+        assert_eq!(result.status, CommandStatus::Applied);
+        assert_eq!(actor.lifecycle, GameLifecycle::Paused);
+    }
+
+    /// A replayable command while Paused is Applied immediately and
+    /// recorded in the command_log.
+    #[test]
+    fn paused_applies_command_immediately() {
+        let (mut actor, _) = test_actor();
+        actor.lifecycle = GameLifecycle::Paused;
+        actor.state = Some(paused_state_at_tick0());
+        let result = actor.handle_command(CommandEnvelope {
+            id: "cmd_g3".to_string(),
+            expected_tick: None,
+            command: Command::SetStationPriority {
+                station_id: StationId("hub_haven".into()),
+                priority: 5,
+            },
+        });
+        assert_eq!(result.status, CommandStatus::Applied);
+        // Command should be recorded in command_log
+        let state = actor.state.as_ref().unwrap();
+        assert!(!state.command_log.is_empty());
+        assert_eq!(state.command_log[0].id, "cmd_g3");
+    }
+
+    /// Same ID + same full envelope returns the stored receipt
+    /// (idempotency replay).
+    #[test]
+    fn same_id_same_envelope_idempotent() {
+        let (mut actor, _) = test_actor();
+        actor.lifecycle = GameLifecycle::Paused;
+        actor.state = Some(paused_state_at_tick0());
+        let envelope = CommandEnvelope {
+            id: "cmd_idem".to_string(),
+            expected_tick: None,
+            command: Command::SetStationPriority {
+                station_id: StationId("hub_haven".into()),
+                priority: 3,
+            },
+        };
+        let first = actor.handle_command(envelope.clone());
+        assert_eq!(first.status, CommandStatus::Applied);
+
+        // Same envelope again — must return stored receipt
+        let second = actor.handle_command(envelope);
+        assert_eq!(second.status, CommandStatus::Applied);
+        assert_eq!(second.server_sequence, first.server_sequence);
+        assert_eq!(second.effective_tick, first.effective_tick);
+    }
+
+    /// Same ID with different envelope (changed command or expected_tick)
+    /// is rejected as IdempotencyConflict.
+    #[test]
+    fn same_id_different_envelope_conflict() {
+        let (mut actor, _) = test_actor();
+        actor.lifecycle = GameLifecycle::Paused;
+        actor.state = Some(paused_state_at_tick0());
+        let envelope1 = CommandEnvelope {
+            id: "cmd_conflict".to_string(),
+            expected_tick: None,
+            command: Command::SetStationPriority {
+                station_id: StationId("hub_haven".into()),
+                priority: 3,
+            },
+        };
+        let first = actor.handle_command(envelope1);
+        assert_eq!(first.status, CommandStatus::Applied);
+
+        // Same ID but different expected_tick — conflict
+        let envelope2 = CommandEnvelope {
+            id: "cmd_conflict".to_string(),
+            expected_tick: Some(1),
+            command: Command::SetStationPriority {
+                station_id: StationId("hub_haven".into()),
+                priority: 3,
+            },
+        };
+        let second = actor.handle_command(envelope2);
+        assert_eq!(second.status, CommandStatus::Rejected);
+        assert_eq!(second.error.as_ref().unwrap().code, "IdempotencyConflict");
+    }
+
+    /// Same ID with same expected_tick but different command body is also
+    /// rejected as IdempotencyConflict.
+    #[test]
+    fn same_id_different_command_body_conflict() {
+        let (mut actor, _) = test_actor();
+        actor.lifecycle = GameLifecycle::Paused;
+        actor.state = Some(paused_state_at_tick0());
+        let envelope1 = CommandEnvelope {
+            id: "cmd_body_conflict".to_string(),
+            expected_tick: None,
+            command: Command::SetStationPriority {
+                station_id: StationId("hub_haven".into()),
+                priority: 3,
+            },
+        };
+        let first = actor.handle_command(envelope1);
+        assert_eq!(first.status, CommandStatus::Applied);
+
+        // Same ID, same expected_tick, but different command (priority
+        // changed from 3 to 9) — must be rejected.
+        let envelope2 = CommandEnvelope {
+            id: "cmd_body_conflict".to_string(),
+            expected_tick: None,
+            command: Command::SetStationPriority {
+                station_id: StationId("hub_haven".into()),
+                priority: 9,
+            },
+        };
+        let second = actor.handle_command(envelope2);
+        assert_eq!(second.status, CommandStatus::Rejected);
+        assert_eq!(second.error.as_ref().unwrap().code, "IdempotencyConflict");
+    }
+
+    /// expected_tick mismatch rejects the command.
+    #[test]
+    fn expected_tick_mismatch_rejected() {
+        let (mut actor, _) = test_actor();
+        actor.lifecycle = GameLifecycle::Running;
+        actor.state = Some(paused_state_at_tick0());
+        // Current tick is 0, expect tick 5 — should be rejected
+        let result = actor.handle_command(CommandEnvelope {
+            id: "cmd_etick".to_string(),
+            expected_tick: Some(5),
+            command: Command::SetStationPriority {
+                station_id: StationId("hub_haven".into()),
+                priority: 3,
+            },
+        });
+        assert_eq!(result.status, CommandStatus::Rejected);
+        assert_eq!(result.error.as_ref().unwrap().code, "ExpectedTickMismatch");
+    }
+
+    /// Commands queued during Running are applied at the correct tick.
+    #[test]
+    fn queued_command_applied_at_next_tick() {
+        let (mut actor, _) = test_actor();
+        actor.lifecycle = GameLifecycle::Running;
+        actor.state = Some(paused_state_at_tick0());
+
+        // Queue a command for tick 1
+        let result = actor.handle_command(CommandEnvelope {
+            id: "cmd_queue1".to_string(),
+            expected_tick: None,
+            command: Command::SetStationPriority {
+                station_id: StationId("hub_haven".into()),
+                priority: 5,
+            },
+        });
+        assert_eq!(result.status, CommandStatus::Accepted);
+        assert_eq!(result.effective_tick, Some(1));
+
+        // Advance one tick — the command should be consumed
+        actor.handle_scheduler_tick();
+        assert_eq!(actor.state.as_ref().unwrap().tick, 1);
+        // pending_commands for tick 1 should now be empty
+        assert!(!actor.pending_commands.contains_key(&1));
+    }
+
+    /// Queued commands are sorted by server_sequence within a tick.
+    #[test]
+    fn queued_commands_sorted_by_sequence() {
+        let (mut actor, _) = test_actor();
+        actor.lifecycle = GameLifecycle::Running;
+        actor.state = Some(paused_state_at_tick0());
+
+        // Submit two commands for the same tick (tick 1)
+        let r1 = actor.handle_command(CommandEnvelope {
+            id: "cmd_seq1".to_string(),
+            expected_tick: None,
+            command: Command::SetStationPriority {
+                station_id: StationId("alpha".into()),
+                priority: 1,
+            },
+        });
+        assert_eq!(r1.status, CommandStatus::Accepted);
+
+        let r2 = actor.handle_command(CommandEnvelope {
+            id: "cmd_seq2".to_string(),
+            expected_tick: None,
+            command: Command::SetStationPriority {
+                station_id: StationId("beta".into()),
+                priority: 2,
+            },
+        });
+        assert_eq!(r2.status, CommandStatus::Accepted);
+
+        // The two sequenced commands should have different server_sequences
+        let seq1 = r1.server_sequence;
+        let seq2 = r2.server_sequence;
+        assert!(seq2 > seq1);
+
+        // After tick advance, they're sorted and consumed
+        actor.handle_scheduler_tick();
+        assert!(!actor.pending_commands.contains_key(&1));
+    }
+
+    /// Session receipts persist after NewGame (state replacement).
+    /// After NewGame the actor is in Loading; gameplay commands are
+    /// rejected by lifecycle validation, but the receipt itself is
+    /// still present for future idempotency once the lifecycle allows
+    /// commands again.
+    #[test]
+    fn session_receipts_survive_new_game() {
+        let (mut actor, _) = test_actor();
+        actor.lifecycle = GameLifecycle::Paused;
+        actor.state = Some(paused_state_at_tick0());
+
+        // Submit a command and get a receipt
+        let result = actor.handle_command(CommandEnvelope {
+            id: "cmd_rec1".to_string(),
+            expected_tick: None,
+            command: Command::SetStationPriority {
+                station_id: StationId("hub_haven".into()),
+                priority: 3,
+            },
+        });
+        assert_eq!(result.status, CommandStatus::Applied);
+
+        // NewGame replaces state but receipts survive
+        let ng_result = actor.handle_command(CommandEnvelope {
+            id: "cmd_rec_ng".to_string(),
+            expected_tick: None,
+            command: Command::NewGame {
+                scenario_id: ScenarioId("starting_system".into()),
+            },
+        });
+        assert_eq!(ng_result.status, CommandStatus::Applied);
+
+        // The receipt for cmd_rec1 should still be present in the map
+        assert!(actor.session_receipts.contains_key("cmd_rec1"));
+
+        // Replay cmd_rec1 while in Loading — lifecycle rejects gameplay
+        // commands, but the receipt remains for use after Loading completes.
+        let replay = actor.handle_command(CommandEnvelope {
+            id: "cmd_rec1".to_string(),
+            expected_tick: None,
+            command: Command::SetStationPriority {
+                station_id: StationId("hub_haven".into()),
+                priority: 3,
+            },
+        });
+        // Rejected because Loading disallows all commands
+        assert_eq!(replay.status, CommandStatus::Rejected);
+        // But the receipt is still in the map
+        assert!(actor.session_receipts.contains_key("cmd_rec1"));
+    }
+
+    /// A control command (AdvanceTicks) from Loading is rejected because
+    /// the lifecycle validation (step 2) rejects all commands during Loading
+    /// per ADR-0004.  Control commands are applied only after lifecycle
+    /// validation passes.
+    #[test]
+    fn advance_ticks_rejected_during_loading() {
+        let (mut actor, _) = test_actor();
+        actor.lifecycle = GameLifecycle::Loading;
+        actor.loading = Some(LoadingStatus {
+            operation: LoadingOperation::NewGame,
+            stage: LoadingStage::ValidatingContent,
+        });
+        let result = actor.handle_command(CommandEnvelope {
+            id: "cmd_loading".to_string(),
+            expected_tick: None,
+            command: Command::AdvanceTicks { count: 10 },
+        });
+        // Loading rejects all commands per lifecycle validation
+        assert_eq!(result.status, CommandStatus::Rejected);
+        assert_eq!(result.error.as_ref().unwrap().code, "InvalidLifecycle");
+    }
+
+    /// A gameplay command with expected_tick=Some(0) at tick 0 passes.
+    #[test]
+    fn expected_tick_zero_at_tick_zero_passes() {
+        let (mut actor, _) = test_actor();
+        actor.lifecycle = GameLifecycle::Paused;
+        actor.state = Some(paused_state_at_tick0());
+        let result = actor.handle_command(CommandEnvelope {
+            id: "cmd_et0".to_string(),
+            expected_tick: Some(0),
+            command: Command::SetStationPriority {
+                station_id: StationId("hub_haven".into()),
+                priority: 3,
+            },
+        });
+        assert_eq!(result.status, CommandStatus::Applied);
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────
