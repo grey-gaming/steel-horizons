@@ -182,7 +182,7 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
   - Verify: canonical examples, quotient greater than one, exact project completion, remainder bounds, overflow/property tests.
   - Depends on: P1-02a.
 
-- [ ] **P1-07 — Deterministic PRNG and travel geometry.**
+|- [x] **P1-07 — Deterministic PRNG and travel geometry.**
   - Deliver: project-owned xoshiro256**, stable iteration helpers, radial/arc route construction, lane/payload speed calculation, zero-distance and wrap behavior.
   - Verify: PRNG golden vectors, radial/arc/combined/zero routes, 6,283 boundary, Research zero-capacity branch, checked-product boundaries.
   - Depends on: P1-06.
@@ -667,4 +667,16 @@ Cumulative gates: `cargo fmt` (clean), `cargo build --locked` (clean), `cargo cl
 Scenarios activated: none (arithmetic-kernel-only increment)
 Golden/hash changes: none
 Notes: Independent review completed via delegated subagent (deleg_3f0961e8). All checks passed. One review finding: added Serialize/Deserialize derives with #[serde(transparent)] to MilliRemainder, MilliDistance, MilliSpeed newtypes to prevent build break when serialization lands in P1-08. New module: `engine/src/arithmetic.rs` with 720 lines containing MilliRemainder, consume_tick, consume_fuel, MilliDistance, MilliSpeed, ArithmeticError, RateError, and 27 focused tests. Rustfmt-formatting changes to canonical.rs, content_hash.rs, and content_validate.rs are cosmetic only (no logic change).
+```
+
+```text
+Increment: P1-07
+Date: 2026-08-06
+Commit: <pending>
+Requirements: GDD 12 §Deterministic Travel, §Save, Load, and Replay (xoshiro256**); ADR-0002 §Numeric Rules, §Randomness; TDD 01 §Travel Geometry
+Focused proof: `cargo test --locked` — 227 tests including 8 PRNG tests (golden vectors, split, range, serde, all-zero invalid, deterministic sequence, divergent seeds) and 37 travel geometry tests (angular diff, wrap, abs diff, lane multipliers, radial/arc/combined/zero routes, life support eligibility, effective speed with payload/research/overflow, serde round-trip, arc direction consistency, radius-1000 scale, 6283 boundary).
+Cumulative gates: `cargo fmt --check` (clean), `cargo build --locked` (clean), `cargo clippy --locked -- -D warnings` (clean), `cargo test --locked` (227/227 pass)
+Scenarios activated: none (PRNG-and-travel-geometry-only increment)
+Golden/hash changes: none
+Notes: Independent review completed via delegated subagent (deleg_7af3a41c). All checks passed with no issues. Golden vectors independently verified against Python reference implementation. New modules: `engine/src/prng.rs` (xoshiro256** with 8 tests) and `engine/src/travel.rs` (angular_diff, TravelPlan::between, effective_speed, lane multipliers, 37 tests). `engine/src/lib.rs` updated with `pub mod travel`. TravelPlan::between constructs zero-, one-, or two-segment routes; radial burn uses 1/2 speed multiplier; lane arc uses destination-lane multiplier; life support eligibility for Outer/Fringe lanes; payload factor via checked_with_payload.
 ```

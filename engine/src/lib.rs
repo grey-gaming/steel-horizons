@@ -31,6 +31,9 @@ pub mod state;
 /// Tick transaction skeleton with phase hooks.
 pub mod tick;
 
+/// Deterministic travel geometry — route construction and speed calculation.
+pub mod travel;
+
 /// Command types and sequencing.
 pub mod command;
 
