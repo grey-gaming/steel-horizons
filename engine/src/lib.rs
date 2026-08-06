@@ -55,5 +55,8 @@ pub mod state_construct;
 /// State hash computation — ADR-0006 canonical state digest.
 pub mod state_hash;
 
+/// Deterministic scenario harness for integration testing.
+pub mod scenario;
+
 /// Convenience re-export of the engine version.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

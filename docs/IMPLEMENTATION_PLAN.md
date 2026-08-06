@@ -197,7 +197,7 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
   - Verify: exact N no-op ticks, phase order/isolation, arrival not readable by later gameplay phases until the next tick, rollback on invariant error.
   - Depends on: P1-08.
 
-- [ ] **P1-10 — Deterministic scenario harness.**
+- [x] **P1-10 — Deterministic scenario harness.**
   - Deliver: canonical content loader, explicit `command_at`, `advance_until`, state/event assertions, invariant and hash helpers; no wall-clock waits.
   - Verify: repeated calls to the ordinary tick function and harness batch advancement of the same N ticks produce identical ADR-0006 replay-equivalence hashes and canonical deterministic event traces.
   - Depends on: P1-09.
@@ -703,4 +703,16 @@ Cumulative gates: `cargo fmt` (clean), `cargo build --locked` (clean), `cargo cl
 Scenarios activated: none (skeleton-only increment)
 Golden/hash changes: none
 Notes: Independent review completed via delegated subagent (deleg_46234a87). All checks passed — no issues found. New module: `engine/src/tick.rs` containing TickTransaction, SimulationError, CommittedTick, TickFacts, TickEvent, 11 empty phase hooks (phase_apply_scheduled_commands through phase_check_victory), and advance_one_tick orchestrator. `engine/src/lib.rs` already exported `pub mod tick` from a prior increment. The skeleton implements pending field changes with explicit reducers, conflict rejection, immutable tick facts for cross-phase communication, atomic commit (advances tick, drains events), and rollback via transaction drop. Invariant check runs before commit. Ten no-op ticks verified advancing tick from 0 to 10. Conflict rejection and reducer allowance tested for root and entity fields.
+```
+
+```text
+Increment: P1-10
+Date: 2026-08-06
+Commit: <pending>
+Requirements: ADR-0002 §Deterministic Tick Simulation, §Execution Modes; GDD 12 §Tick and Time Modes, §Tick Transaction and Phase Order; TDD 01 §Simulation Engine
+Focused proof: `cargo test --locked` — 274 tests including 16 scenario harness tests (construction, tick advancement, equivalence proof, assertion helpers, command_at placeholder, from_state constructor, golden hash match). Core proof: `tick_by_tick_vs_batch_equivalence` and `tick_by_tick_vs_batch_event_trace_equivalence` — both verify that repeated calls to ordinary `advance_one_tick` and harness batch `advance_until` produce identical state hashes and event traces.
+Cumulative gates: `cargo fmt --check` (clean), `cargo build --locked` (clean), `cargo clippy --locked -- -D warnings` (clean), `cargo test --locked` (274/274 pass)
+Scenarios activated: `tick_by_tick_vs_batch_equivalence` (P1-10 scenario, mandatory from this increment)
+Golden/hash changes: none (tick-0 state hash matches existing golden `d9da3778c8cc6814472532b575533c3babfa5d04faf5d4a03f8cf6e2410d5eff`)
+Notes: Independent review delegated. New module: `engine/src/scenario.rs` (595 lines). Provides `ScenarioHarness` with canonical content loader, `command_at`, `advance_until`, state/event assertions, invariant and hash helpers, `from_state` constructor, and `state_mut` for test-specific setup. No wall-clock waits — all advancement uses the ordinary `advance_one_tick` pure function. `command_at` is a placeholder recording pending commands for P1-12 integration. 16 focused tests cover construction, tick advancement, equivalence proof, assertion helpers, and golden hash match.
 ```
