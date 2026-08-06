@@ -35,3 +35,6 @@ schemas/content/
 save.json
 connection.json
 logs/
+
+# Agent artifacts
+.hermes/
