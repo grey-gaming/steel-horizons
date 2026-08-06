@@ -192,7 +192,7 @@ Gate 0 evidence is recorded like implementation evidence. If an item materially 
   - Verify: exact tick-zero snapshot/hash, complete Hub/Builder fields, Serde round trip, malformed-state negatives, insertion-order independence, exact generated prefixes/next-unused formatting, checked overflow, rollback non-consumption, committed non-reuse, and save/replay counter continuity.
   - Depends on: G0-02, P1-02b, P1-03, P1-06, P1-07.
 
-- [ ] **P1-09 — Tick transaction skeleton.**
+- [x] **P1-09 — Tick transaction skeleton.**
   - Deliver: pending field changes, explicit reducers, conflict rejection, all eleven fixed phase hooks, immutable tick facts, atomic commit/rollback, committed event hook.
   - Verify: exact N no-op ticks, phase order/isolation, arrival not readable by later gameplay phases until the next tick, rollback on invariant error.
   - Depends on: P1-08.
@@ -691,4 +691,16 @@ Cumulative gates: `cargo fmt` (clean), `cargo build --locked` (clean), `cargo cl
 Scenarios activated: none (constructor-and-invariants-only increment)
 Golden/hash changes: `tests/goldens/state_hash.txt` created — `d9da3778c8cc6814472532b575533c3babfa5d04faf5d4a03f8cf6e2410d5eff`
 Notes: Independent review completed via delegated subagent (deleg_6c895178). All checks passed with no issues found. New modules: `engine/src/state_construct.rs` (canonical tick-zero constructor + cheap invariant checker with 15 tests) and `engine/src/state_hash.rs` (canonical state hash with 4 tests and golden file). `engine/src/lib.rs` updated with `pub mod state_construct` and `pub mod state_hash`. The constructor maps every StartingScenario field into GameState at tick 0, preserving authored IDs and display names; empty collections for runtime-only maps. The invariant checker validates RNG state, fuel remainders, dock consistency, buffer bounds, sparse BTreeMap values, gate build, and IdCounters. The state hash uses the same ADR-0006 domain-separation pattern as content_hash.rs.
+```
+
+```text
+Increment: P1-09
+Date: 2026-08-06
+Commit: <placeholder>
+Requirements: ADR-0002 §Tick Transaction; GDD 12 §Tick Transaction and Phase Order; TDD 01 §Tick Implementation
+Focused proof: `cargo test --lib` — 258 tests including 13 tick transaction tests (initial state, commit advances tick, double-commit rejection, conflict detection, reducer allowance, phase order execution, invariant rollback, state readonly, event accumulation, tick facts recording, single noop tick, ten consecutive noop ticks). All phases are empty stubs; the skeleton provides pending-changes tracking with conflict rejection, immutable tick facts, atomic commit, and rollback on invariant error.
+Cumulative gates: `cargo fmt` (clean), `cargo build --locked` (clean), `cargo clippy --locked -- -D warnings` (clean), `cargo test --locked` (258/258 pass)
+Scenarios activated: none (skeleton-only increment)
+Golden/hash changes: none
+Notes: Independent review completed via delegated subagent (deleg_46234a87). All checks passed — no issues found. New module: `engine/src/tick.rs` containing TickTransaction, SimulationError, CommittedTick, TickFacts, TickEvent, 11 empty phase hooks (phase_apply_scheduled_commands through phase_check_victory), and advance_one_tick orchestrator. `engine/src/lib.rs` already exported `pub mod tick` from a prior increment. The skeleton implements pending field changes with explicit reducers, conflict rejection, immutable tick facts for cross-phase communication, atomic commit (advances tick, drains events), and rollback via transaction drop. Invariant check runs before commit. Ten no-op ticks verified advancing tick from 0 to 10. Conflict rejection and reducer allowance tested for root and entity fields.
 ```
