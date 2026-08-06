@@ -12,6 +12,7 @@
 //! - TDD 02 §Queries
 
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use tokio::sync::{mpsc, oneshot, watch};
@@ -22,6 +23,7 @@ use crate::command::CommandStatus;
 use crate::command::ReplayableGameCommand;
 use crate::content::ContentCatalog;
 use crate::lifecycle::*;
+use crate::persistence::{SaveEnvelope, WriteResult};
 use crate::state::*;
 use crate::tick::*;
 use crate::types::*;
@@ -131,6 +133,8 @@ pub struct SimulationActor {
     mailbox_tx: Option<mpsc::UnboundedSender<ActorMessage>>,
     /// Whether shutdown has been requested.
     shutdown_requested: bool,
+    /// Autosave file path (None if persistence disabled).
+    autosave_path: Option<PathBuf>,
 }
 
 pub use crate::command::SequencedCommand;
@@ -161,7 +165,7 @@ pub struct SessionReceipt {
     /// The rejection details, if rejected.
     pub error: Option<CommandRejection>,
     /// Structural fingerprint of the full envelope for idempotency.
-    envelope_hash: u64,
+    pub envelope_hash: u64,
 }
 
 /// A stored event (placeholder — full event store in P1-31).
@@ -208,6 +212,7 @@ impl SimulationActor {
             mailbox_rx,
             mailbox_tx: Some(mailbox_tx.clone()),
             shutdown_requested: false,
+            autosave_path: None,
         };
 
         (actor, mailbox_tx, snapshot_rx, status_rx)
@@ -254,6 +259,15 @@ impl SimulationActor {
             }
         }
         true
+    }
+
+    /// Enable persistence with the given autosave path.
+    ///
+    /// Stores the autosave path for SaveNow and LoadAutosave operations.
+    /// SaveNow performs synchronous atomic writes directly (no worker needed).
+    /// LoadAutosave reads the save file directly via the persistence module.
+    pub fn enable_persistence(&mut self, autosave_path: PathBuf) {
+        self.autosave_path = Some(autosave_path);
     }
 
     /// Run the actor event loop, processing messages until shutdown.
@@ -427,9 +441,9 @@ impl SimulationActor {
         // ── 7. Determine effective behavior based on lifecycle ─────────
         let effective_tick: Option<u64>;
         let mut resulting_tick: Option<u64>;
-        let status: CommandStatus;
+        let mut status: CommandStatus;
         let result: Option<CommandResult>;
-        let error: Option<CommandRejection>;
+        let mut error: Option<CommandRejection>;
 
         // Control commands are allowed from any lifecycle (they've already
         // passed step 2's per-command validation).  Gameplay commands are
@@ -497,6 +511,63 @@ impl SimulationActor {
                         stage: LoadingStage::ValidatingContent,
                     });
                     self.update_status();
+                }
+                crate::command::Command::SaveNow => {
+                    // SaveNow requires a loaded game state and persistence enabled.
+                    let save_result = if let (Some(state), Some(ref autosave_path)) =
+                        (self.state.as_ref(), &self.autosave_path)
+                    {
+                        // Compute content hash from the catalog.
+                        let content_hash = match crate::content_hash::compute_content_hash(
+                            &self.content,
+                        )
+                        .map(|h| crate::content_hash::format_hash(&h))
+                        {
+                            Ok(h) => h,
+                            Err(e) => {
+                                error = Some(CommandRejection {
+                                    code: "SaveFailed".to_string(),
+                                    message: format!("content hash failed: {}", e),
+                                    details: BTreeMap::new(),
+                                });
+                                status = CommandStatus::Rejected;
+                                // Use a dummy hash so the error path is taken below
+                                "0000000000000000000000000000000000000000000000000000000000000000"
+                                    .to_string()
+                            }
+                        };
+                        let content_version = &self.content.starting_system.content_version;
+
+                        match SaveEnvelope::new((*state).clone(), content_version, &content_hash) {
+                            Ok(envelope) => {
+                                // Write synchronously — the actor must acknowledge
+                                // only after the write completes (ADR-0008 §4).
+                                match crate::persistence::sync_atomic_write(
+                                    autosave_path,
+                                    &envelope,
+                                ) {
+                                    WriteResult::Success => None,
+                                    WriteResult::Failure(e) => Some(e.to_string()),
+                                }
+                            }
+                            Err(e) => Some(e.to_string()),
+                        }
+                    } else {
+                        if self.state.is_none() {
+                            Some("no game state loaded".to_string())
+                        } else {
+                            Some("persistence not enabled".to_string())
+                        }
+                    };
+
+                    if let Some(ref msg) = save_result {
+                        error = Some(CommandRejection {
+                            code: "SaveFailed".to_string(),
+                            message: msg.clone(),
+                            details: BTreeMap::new(),
+                        });
+                        status = CommandStatus::Rejected;
+                    }
                 }
                 crate::command::Command::LoadAutosave => {
                     self.lifecycle = GameLifecycle::Loading;
@@ -739,16 +810,98 @@ impl SimulationActor {
                 }
             }
             LoadingOperation::LoadAutosave => {
-                // Placeholder — real persistence in P1-13.
-                self.state = prior_state;
-                self.lifecycle = prior_lifecycle;
-                self.loading = None;
-                self.update_status();
-                LoadGameResult {
-                    lifecycle: prior_lifecycle,
-                    tick: 0,
-                    error: Some("LoadAutosave not yet implemented".to_string()),
-                }
+                // ── Load autosave via persistence worker ────────────────
+                let load_result = if let Some(ref autosave_path) = self.autosave_path {
+                    // Use the persistence module's read_save_envelope directly.
+                    let envelope = crate::persistence::read_save_envelope(autosave_path);
+                    match envelope {
+                        Ok(envelope) => {
+                            // Validate content compatibility
+                            let computed_hash =
+                                crate::content_hash::compute_content_hash(&self.content)
+                                    .map(|h| crate::content_hash::format_hash(&h))
+                                    .unwrap_or_else(|_| "unknown".to_string());
+                            let content_version = &self.content.starting_system.content_version;
+
+                            // Validate envelope against content and compute
+                            // state hash verification.
+                            let validation = crate::persistence::validate_loaded_state(
+                                &envelope,
+                                &envelope.game_state,
+                                content_version,
+                                &computed_hash,
+                            );
+
+                            match validation {
+                                Ok(()) => {
+                                    // Load succeeded — replace state.
+                                    let state = envelope.game_state;
+
+                                    // Rebuild pending commands and session
+                                    // receipts from the command_log.
+                                    self.pending_commands =
+                                        crate::persistence::rebuild_pending_from_log(&state);
+                                    self.session_receipts =
+                                        crate::persistence::seed_receipts_from_log(&state);
+
+                                    // Restore next_server_sequence from state
+                                    // ADR-0008 §2: max of runtime counter and loaded lower bound
+                                    self.next_session_sequence = std::cmp::max(
+                                        self.next_session_sequence,
+                                        state.next_server_sequence,
+                                    );
+
+                                    self.state = Some(state);
+                                    self.lifecycle = GameLifecycle::Paused;
+                                    self.loading = None;
+                                    self.publish_snapshot();
+                                    LoadGameResult {
+                                        lifecycle: GameLifecycle::Paused,
+                                        tick: self.state.as_ref().map_or(0, |s| s.tick),
+                                        error: None,
+                                    }
+                                }
+                                Err(e) => {
+                                    // Validation failed — restore prior state.
+                                    self.state = prior_state;
+                                    self.lifecycle = prior_lifecycle;
+                                    self.loading = None;
+                                    self.update_status();
+                                    LoadGameResult {
+                                        lifecycle: prior_lifecycle,
+                                        tick: 0,
+                                        error: Some(format!("{}", e)),
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            // Read failed — restore prior state.
+                            self.state = prior_state;
+                            self.lifecycle = prior_lifecycle;
+                            self.loading = None;
+                            self.update_status();
+                            LoadGameResult {
+                                lifecycle: prior_lifecycle,
+                                tick: 0,
+                                error: Some(format!("{}", e)),
+                            }
+                        }
+                    }
+                } else {
+                    // No persistence path configured.
+                    self.state = prior_state;
+                    self.lifecycle = prior_lifecycle;
+                    self.loading = None;
+                    self.update_status();
+                    LoadGameResult {
+                        lifecycle: prior_lifecycle,
+                        tick: 0,
+                        error: Some("persistence not enabled".to_string()),
+                    }
+                };
+                // Return the result from the closure
+                load_result
             }
         }
     }

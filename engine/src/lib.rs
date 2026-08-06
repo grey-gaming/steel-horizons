@@ -61,6 +61,9 @@ pub mod scenario;
 /// Lifecycle state machine and runtime status types.
 pub mod lifecycle;
 
+/// Persistence: save envelope, FIFO worker, atomic replacement, migration.
+pub mod persistence;
+
 /// Simulation actor — sole mutable GameState owner.
 pub mod actor;
 
