@@ -46,6 +46,11 @@ echo "--- Rust tests ---"
 cargo test --locked 2>&1
 echo "PASS: Rust tests OK"
 
+# 5b. Generated-content schema drift check (M3)
+echo "--- Schema export --check ---"
+scripts/schema-export.sh --check
+echo "PASS: committed schemas match generated schemas"
+
 # 6. Python scaffold checks (formatting, typing, unit smoke)
 echo "--- Python checks ---"
 python3 -m pip install -q hatchling ruff mypy pytest 2>&1

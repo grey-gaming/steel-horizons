@@ -337,11 +337,31 @@ impl SimulationActor {
 
         // ── 3. Idempotency check ──────────────────────────────────────
         if let Some(existing) = self.session_receipts.get(&envelope.id) {
-            // Compute a structural hash of the incoming envelope.
-            use std::hash::{Hash, Hasher};
-            let mut hasher = std::collections::hash_map::DefaultHasher::new();
-            envelope.hash(&mut hasher);
-            let incoming_hash = hasher.finish();
+            // Compute a canonical structural hash of the incoming envelope
+            // (ADR-0006 canonical v1 writer — deterministic across runs).
+            let incoming_hash = match crate::command::envelope_canonical_hash(&envelope) {
+                Ok(h) => h,
+                Err(e) => {
+                    // Canonical serialization of a valid envelope cannot fail;
+                    // treat a failure as a hard command error, never a panic.
+                    return CommandAcknowledgement {
+                        protocol_version: "v1".to_string(),
+                        id: envelope.id.clone(),
+                        accepted: false,
+                        status: CommandStatus::Failed,
+                        effective_tick: None,
+                        resulting_tick: None,
+                        server_sequence: self.next_session_sequence,
+                        game_state: self.lifecycle,
+                        result: None,
+                        error: Some(CommandRejection {
+                            code: "CommandFailed".to_string(),
+                            message: format!("envelope fingerprint failed: {e}"),
+                            details: std::collections::BTreeMap::new(),
+                        }),
+                    };
+                }
+            };
 
             if incoming_hash == existing.envelope_hash {
                 // Idempotency hit — return the stored receipt.
@@ -458,7 +478,12 @@ impl SimulationActor {
         } else {
             match self.lifecycle {
                 GameLifecycle::Running => {
-                    // Replayable commands queue for the next tick.
+                    // Replayable commands queue for the next tick and are
+                    // appended to the command log at acceptance (ADR-0008 §2):
+                    // the log is the durable source of truth, and the runtime
+                    // pending schedule is derived from it.  The `Accepted ->
+                    // Applied` outcome transition happens in the same atomic
+                    // transaction as the tick commit (tick.rs `commit()`).
                     let next_tick = current_tick + 1;
                     self.pending_commands
                         .entry(next_tick)
@@ -467,6 +492,19 @@ impl SimulationActor {
                             server_sequence: seq,
                             envelope: envelope.clone(),
                         });
+                    if let Some(ref mut state) = self.state {
+                        state.command_log.push(CommandRecord {
+                            id: envelope.id.clone(),
+                            expected_tick: envelope.expected_tick,
+                            effective_tick: next_tick,
+                            server_sequence: seq,
+                            application_boundary: CommandApplicationBoundary::ScheduledTick,
+                            command: ReplayableGameCommand::from(&envelope.command),
+                            outcome: CommandOutcome::Accepted,
+                            result: None,
+                            rejection: None,
+                        });
+                    }
                     effective_tick = Some(next_tick);
                     resulting_tick = None;
                     status = CommandStatus::Accepted;
@@ -505,77 +543,88 @@ impl SimulationActor {
         if is_immediate && status != CommandStatus::Rejected {
             match &envelope.command {
                 crate::command::Command::NewGame { .. } => {
-                    self.lifecycle = GameLifecycle::Loading;
-                    self.loading = Some(LoadingStatus {
-                        operation: LoadingOperation::NewGame,
-                        stage: LoadingStage::ValidatingContent,
-                    });
-                    self.update_status();
+                    // ADR-0004: NewGame -> Loading -> Paused/Won.  The load
+                    // completes synchronously; a failure surfaces as a Failed
+                    // acknowledgement rather than leaving the actor Loading.
+                    let load = self.handle_load_game(LoadingOperation::NewGame);
+                    if let Some(e) = load.error {
+                        status = CommandStatus::Failed;
+                        error = Some(CommandRejection {
+                            code: "CommandFailed".to_string(),
+                            message: e,
+                            details: BTreeMap::new(),
+                        });
+                    }
                 }
                 crate::command::Command::SaveNow => {
                     // SaveNow requires a loaded game state and persistence enabled.
-                    let save_result = if let (Some(state), Some(ref autosave_path)) =
-                        (self.state.as_ref(), &self.autosave_path)
-                    {
-                        // Compute content hash from the catalog.
-                        let content_hash = match crate::content_hash::compute_content_hash(
-                            &self.content,
-                        )
-                        .map(|h| crate::content_hash::format_hash(&h))
+                    let save_result: Option<String> =
+                        if let (Some(state), Some(ref autosave_path)) =
+                            (self.state.as_ref(), &self.autosave_path)
                         {
-                            Ok(h) => h,
-                            Err(e) => {
-                                error = Some(CommandRejection {
-                                    code: "SaveFailed".to_string(),
-                                    message: format!("content hash failed: {}", e),
-                                    details: BTreeMap::new(),
-                                });
-                                status = CommandStatus::Rejected;
-                                // Use a dummy hash so the error path is taken below
-                                "0000000000000000000000000000000000000000000000000000000000000000"
-                                    .to_string()
-                            }
-                        };
-                        let content_version = &self.content.starting_system.content_version;
+                            // Compute content hash from the catalog; a failure aborts
+                            // the save — never persist a corrupt envelope (ADR-0006
+                            // §5-7), and never fall back to a dummy hash.
+                            let content_hash: Result<String, String> =
+                                crate::content_hash::compute_content_hash(&self.content)
+                                    .map(|h| crate::content_hash::format_hash(&h))
+                                    .map_err(|e| format!("content hash failed: {e}"));
 
-                        match SaveEnvelope::new((*state).clone(), content_version, &content_hash) {
-                            Ok(envelope) => {
-                                // Write synchronously — the actor must acknowledge
-                                // only after the write completes (ADR-0008 §4).
-                                match crate::persistence::sync_atomic_write(
-                                    autosave_path,
-                                    &envelope,
-                                ) {
-                                    WriteResult::Success => None,
-                                    WriteResult::Failure(e) => Some(e.to_string()),
+                            match content_hash {
+                                Err(e) => Some(e),
+                                Ok(hash) => {
+                                    let content_version =
+                                        &self.content.starting_system.content_version;
+                                    match SaveEnvelope::new(
+                                        (*state).clone(),
+                                        content_version,
+                                        &hash,
+                                    ) {
+                                        Ok(envelope) => {
+                                            // Write synchronously — the actor must acknowledge
+                                            // only after the write completes (ADR-0008 §4).
+                                            match crate::persistence::sync_atomic_write(
+                                                autosave_path,
+                                                &envelope,
+                                            ) {
+                                                WriteResult::Success => None,
+                                                WriteResult::Failure(e) => Some(e.to_string()),
+                                            }
+                                        }
+                                        Err(e) => Some(e.to_string()),
+                                    }
                                 }
                             }
-                            Err(e) => Some(e.to_string()),
-                        }
-                    } else {
-                        if self.state.is_none() {
+                        } else if self.state.is_none() {
                             Some("no game state loaded".to_string())
                         } else {
                             Some("persistence not enabled".to_string())
-                        }
-                    };
+                        };
 
+                    // ADR-0008 §4 / TDD 02: an infrastructure failure is a
+                    // Failed acknowledgement with code CommandFailed (HTTP 500),
+                    // never a Rejected (409).
                     if let Some(ref msg) = save_result {
                         error = Some(CommandRejection {
-                            code: "SaveFailed".to_string(),
+                            code: "CommandFailed".to_string(),
                             message: msg.clone(),
                             details: BTreeMap::new(),
                         });
-                        status = CommandStatus::Rejected;
+                        status = CommandStatus::Failed;
                     }
                 }
                 crate::command::Command::LoadAutosave => {
-                    self.lifecycle = GameLifecycle::Loading;
-                    self.loading = Some(LoadingStatus {
-                        operation: LoadingOperation::LoadAutosave,
-                        stage: LoadingStage::ReadingSave,
-                    });
-                    self.update_status();
+                    // ADR-0004/ADR-0007: LoadAutosave -> Loading -> Paused/Won.
+                    // Completes synchronously through the persistence layer.
+                    let load = self.handle_load_game(LoadingOperation::LoadAutosave);
+                    if let Some(e) = load.error {
+                        status = CommandStatus::Failed;
+                        error = Some(CommandRejection {
+                            code: "CommandFailed".to_string(),
+                            message: e,
+                            details: BTreeMap::new(),
+                        });
+                    }
                 }
                 crate::command::Command::Pause => {
                     if self.lifecycle == GameLifecycle::Running {
@@ -624,12 +673,32 @@ impl SimulationActor {
         }
 
         // ── 9. Record session receipt ─────────────────────────────────
-        // Compute envelope hash for idempotency before consuming
-        // `envelope` (it is moved below for `id`).
-        use std::hash::{Hash, Hasher};
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        envelope.hash(&mut hasher);
-        let env_hash = hasher.finish();
+        // Compute the canonical envelope hash for idempotency before
+        // consuming `envelope` (it is moved below for `id`).  Deterministic
+        // across runs (ADR-0006 canonical v1 writer), so receipts survive
+        // save/load replay exactly.
+        let env_hash = match crate::command::envelope_canonical_hash(&envelope) {
+            Ok(h) => h,
+            Err(e) => {
+                // Canonical serialization of a valid envelope cannot fail.
+                return CommandAcknowledgement {
+                    protocol_version: "v1".to_string(),
+                    id: envelope.id.clone(),
+                    accepted: false,
+                    status: CommandStatus::Failed,
+                    effective_tick,
+                    resulting_tick,
+                    server_sequence: seq,
+                    game_state: self.lifecycle,
+                    result: None,
+                    error: Some(CommandRejection {
+                        code: "CommandFailed".to_string(),
+                        message: format!("envelope fingerprint failed: {e}"),
+                        details: std::collections::BTreeMap::new(),
+                    }),
+                };
+            }
+        };
         let receipt = SessionReceipt {
             id: envelope.id.clone(),
             server_sequence: seq,
@@ -678,6 +747,13 @@ impl SimulationActor {
                 }
                 Err(_e) => {
                     // On error, transition to Paused and emit error.
+                    //
+                    // NOTE (deferred, H5 / ADR-0008 §3): true failure-isolation
+                    // commits — reject the due commands in the log, keep the
+                    // previous committed state, and record CommandFailed — are
+                    // deferred until real domain application lands.  Today
+                    // application is a no-op stub that cannot fail, so this
+                    // error path is unreachable except on invariant violation.
                     self.lifecycle = GameLifecycle::Paused;
                     state.lifecycle = GameLifecycle::Paused;
                     self.update_status();
@@ -785,6 +861,13 @@ impl SimulationActor {
                 let result = crate::state_construct::build_starting_state(&self.content);
                 match result {
                     Ok(game_state) => {
+                        // NewGame replaces the entire timeline: the fresh state
+                        // has an empty command log, so the pending schedule is
+                        // cleared and any loaded receipts are exactly the fresh
+                        // log's (empty).  Existing session receipts absent from
+                        // the fresh log remain idempotency tombstones
+                        // (ADR-0008 §5).
+                        self.pending_commands.clear();
                         self.state = Some(game_state);
                         self.lifecycle = GameLifecycle::Paused;
                         self.loading = None;
@@ -841,8 +924,37 @@ impl SimulationActor {
                                     // receipts from the command_log.
                                     self.pending_commands =
                                         crate::persistence::rebuild_pending_from_log(&state);
-                                    self.session_receipts =
-                                        crate::persistence::seed_receipts_from_log(&state);
+
+                                    // Seed session receipts from the loaded log,
+                                    // then merge into the existing ledger with
+                                    // ADR-0008 §5 collision rejection (must
+                                    // precede state publication).
+                                    let loaded_receipts =
+                                        match crate::persistence::seed_receipts_from_log(&state) {
+                                            Ok(r) => r,
+                                            Err(e) => {
+                                                self.state = prior_state;
+                                                self.lifecycle = prior_lifecycle;
+                                                self.loading = None;
+                                                self.update_status();
+                                                return LoadGameResult {
+                                                    lifecycle: prior_lifecycle,
+                                                    tick: 0,
+                                                    error: Some(format!("seed receipts: {e}")),
+                                                };
+                                            }
+                                        };
+                                    if let Err(e) = self.merge_loaded_receipts(&loaded_receipts) {
+                                        self.state = prior_state;
+                                        self.lifecycle = prior_lifecycle;
+                                        self.loading = None;
+                                        self.update_status();
+                                        return LoadGameResult {
+                                            lifecycle: prior_lifecycle,
+                                            tick: 0,
+                                            error: Some(e),
+                                        };
+                                    }
 
                                     // Restore next_server_sequence from state
                                     // ADR-0008 §2: max of runtime counter and loaded lower bound
@@ -904,6 +1016,62 @@ impl SimulationActor {
                 load_result
             }
         }
+    }
+
+    /// ADR-0008 §5: merge a loaded receipt ledger into the existing session
+    /// ledger for a same-process LoadAutosave.
+    ///
+    /// Collision rules (reject the load before state publication):
+    /// - Same id, different envelope fingerprint → ambiguous receipt collision.
+    /// - Same envelope fingerprint, different server_sequence → ambiguous
+    ///   receipt collision.
+    /// - Identical envelope + server_sequence → the loaded record replaces the
+    ///   receipt (authoritative timeline); an Accepted loaded record is
+    ///   reported as pending (mapped by `seed_receipts_from_log`).
+    ///
+    /// Existing session receipts absent from the loaded log remain idempotency
+    /// tombstones: an exact retry returns the original receipt without
+    /// recreating an effect.
+    fn merge_loaded_receipts(
+        &mut self,
+        loaded: &std::collections::BTreeMap<String, SessionReceipt>,
+    ) -> Result<(), String> {
+        let mut merged: std::collections::BTreeMap<String, SessionReceipt> =
+            std::collections::BTreeMap::new();
+
+        // Keep every existing tombstone, overlaying/validating loaded records.
+        for (id, existing) in self.session_receipts.iter() {
+            match loaded.get(id) {
+                None => {
+                    // Existing receipt absent from the loaded log — keep as tombstone.
+                    merged.insert(id.clone(), existing.clone());
+                }
+                Some(loaded_rec) => {
+                    if loaded_rec.envelope_hash != existing.envelope_hash {
+                        return Err(format!(
+                            "ambiguous receipt collision for id '{id}': envelope fingerprint differs"
+                        ));
+                    }
+                    if loaded_rec.server_sequence != existing.server_sequence {
+                        return Err(format!(
+                            "ambiguous receipt collision for id '{id}': server_sequence differs"
+                        ));
+                    }
+                    // Identical envelope + sequence — the loaded record is
+                    // authoritative (replaces outcome/effective tick).
+                    merged.insert(id.clone(), loaded_rec.clone());
+                }
+            }
+        }
+        // Any loaded record whose id was absent from the existing ledger.
+        for (id, rec) in loaded.iter() {
+            if !self.session_receipts.contains_key(id) {
+                merged.insert(id.clone(), rec.clone());
+            }
+        }
+
+        self.session_receipts = merged;
+        Ok(())
     }
 
     // ─── Snapshot and status publication ───────────────────────────────
@@ -982,9 +1150,11 @@ mod tests {
 
     // ─── Lifecycle transition tests ───────────────────────────────────
 
-    /// NewGame command transitions to Loading.
+    /// NewGame command completes loading synchronously to Paused with a
+    /// canonical starting state (H1: synchronous Loading -> Paused/Won with
+    /// failure surfacing; the Loading sub-state is never left dangling).
     #[test]
-    fn new_game_transitions_to_loading() {
+    fn new_game_completes_loading_to_paused() {
         let (mut actor, _) = test_actor();
         let result = actor.handle_command(CommandEnvelope {
             id: "cmd_001".to_string(),
@@ -994,8 +1164,13 @@ mod tests {
             },
         });
         assert_eq!(result.status, CommandStatus::Applied);
-        assert_eq!(actor.lifecycle, GameLifecycle::Loading);
-        assert!(actor.loading.is_some());
+        assert_eq!(actor.lifecycle, GameLifecycle::Paused);
+        assert!(actor.state.is_some());
+        assert!(actor.loading.is_none());
+        // The loaded state is the canonical starting state at tick 0.
+        let state = actor.state.as_ref().unwrap();
+        assert_eq!(state.lifecycle, GameLifecycle::Paused);
+        assert_eq!(state.tick, 0);
     }
 
     /// Pause command from Running transitions to Paused.
@@ -1003,7 +1178,7 @@ mod tests {
     fn pause_from_running() {
         let (mut actor, _) = test_actor();
         actor.lifecycle = GameLifecycle::Running;
-        actor.state = Some(paused_state_at_tick0());
+        actor.state = Some(running_state_at_tick0());
         let result = actor.handle_command(CommandEnvelope {
             id: "cmd_002".to_string(),
             expected_tick: None,
@@ -1053,7 +1228,7 @@ mod tests {
     fn scheduler_tick_advances_when_running() {
         let (mut actor, _) = test_actor();
         actor.lifecycle = GameLifecycle::Running;
-        actor.state = Some(paused_state_at_tick0());
+        actor.state = Some(running_state_at_tick0());
         actor.handle_scheduler_tick();
         assert_eq!(actor.state.as_ref().unwrap().tick, 1);
     }
@@ -1088,7 +1263,7 @@ mod tests {
     fn advance_ticks_rejected_when_running() {
         let (mut actor, _) = test_actor();
         actor.lifecycle = GameLifecycle::Running;
-        actor.state = Some(paused_state_at_tick0());
+        actor.state = Some(running_state_at_tick0());
         let result = actor.handle_advance_ticks(10);
         assert!(result.error.is_some());
         assert_eq!(result.ticks_advanced, 0);
@@ -1377,7 +1552,7 @@ mod tests {
     fn running_queues_replayable_command() {
         let (mut actor, _) = test_actor();
         actor.lifecycle = GameLifecycle::Running;
-        actor.state = Some(paused_state_at_tick0());
+        actor.state = Some(running_state_at_tick0());
         let result = actor.handle_command(CommandEnvelope {
             id: "cmd_g1".to_string(),
             expected_tick: None,
@@ -1391,12 +1566,92 @@ mod tests {
         assert!(actor.pending_commands.contains_key(&1));
     }
 
+    /// H3: Running-queued commands are written to the command log at
+    /// acceptance and survive save/load with exact state-hash + command-log
+    /// equivalence (ADR-0008 §2 durable Accepted, §6 normalization).
+    #[test]
+    fn running_queued_commands_survive_save_load() {
+        let (mut actor, _) = test_actor();
+        actor.lifecycle = GameLifecycle::Running;
+        actor.state = Some(running_state_at_tick0());
+
+        // Queue a replayable command for tick 1, advance one tick (it applies
+        // at tick 1), then queue a second command for tick 2.
+        let r1 = actor.handle_command(CommandEnvelope {
+            id: "cmd_h3a".to_string(),
+            expected_tick: None,
+            command: Command::SetStationPriority {
+                station_id: StationId("hub_haven".into()),
+                priority: 5,
+            },
+        });
+        assert_eq!(r1.status, CommandStatus::Accepted);
+        assert_eq!(r1.effective_tick, Some(1));
+        actor.handle_scheduler_tick();
+        assert_eq!(actor.state.as_ref().unwrap().tick, 1);
+
+        let r2 = actor.handle_command(CommandEnvelope {
+            id: "cmd_h3b".to_string(),
+            expected_tick: None,
+            command: Command::SetStationPriority {
+                station_id: StationId("hub_haven".into()),
+                priority: 3,
+            },
+        });
+        assert_eq!(r2.status, CommandStatus::Accepted);
+        assert_eq!(r2.effective_tick, Some(2));
+
+        // The log holds the Applied tick-1 record and the Accepted tick-2
+        // record (H2/H3 durable log; ScheduledTick boundary).
+        let state = actor.state.as_ref().unwrap();
+        assert_eq!(state.command_log.len(), 2);
+        assert!(state
+            .command_log
+            .iter()
+            .all(|r| r.application_boundary == CommandApplicationBoundary::ScheduledTick));
+        assert_eq!(
+            state
+                .command_log
+                .iter()
+                .filter(|r| r.outcome == CommandOutcome::Accepted)
+                .count(),
+            1
+        );
+
+        // Save mid-Running: SaveEnvelope::new normalizes Running -> Paused but
+        // must preserve the log (ADR-0008 §6).
+        let content_version = &actor.content.starting_system.content_version;
+        let ch = crate::content_hash::compute_content_hash(&actor.content)
+            .map(|h| crate::content_hash::format_hash(&h))
+            .unwrap();
+        let envelope = SaveEnvelope::new((*state).clone(), content_version, &ch).unwrap();
+        assert_eq!(envelope.game_state.lifecycle, GameLifecycle::Paused);
+
+        // Loaded game state must carry an identical command log and a state
+        // hash that matches the persisted envelope hash (no corruption).
+        let loaded_state = &envelope.game_state;
+        assert_eq!(loaded_state.command_log, state.command_log);
+        assert_eq!(
+            crate::state_hash::format_state_hash(
+                &crate::state_hash::compute_state_hash(loaded_state).unwrap()
+            ),
+            envelope.state_hash,
+            "loaded state hash must match the persisted envelope hash"
+        );
+
+        // Replay: rebuild the pending schedule from the loaded log reproduces
+        // the in-flight Accepted command at tick 2.
+        let pending = crate::persistence::rebuild_pending_from_log(loaded_state);
+        assert!(!pending.contains_key(&1));
+        assert!(pending.contains_key(&2));
+    }
+
     /// A control command while Running is Applied immediately.
     #[test]
     fn running_applies_control_immediately() {
         let (mut actor, _) = test_actor();
         actor.lifecycle = GameLifecycle::Running;
-        actor.state = Some(paused_state_at_tick0());
+        actor.state = Some(running_state_at_tick0());
         let result = actor.handle_command(CommandEnvelope {
             id: "cmd_g2".to_string(),
             expected_tick: None,
@@ -1523,7 +1778,7 @@ mod tests {
     fn expected_tick_mismatch_rejected() {
         let (mut actor, _) = test_actor();
         actor.lifecycle = GameLifecycle::Running;
-        actor.state = Some(paused_state_at_tick0());
+        actor.state = Some(running_state_at_tick0());
         // Current tick is 0, expect tick 5 — should be rejected
         let result = actor.handle_command(CommandEnvelope {
             id: "cmd_etick".to_string(),
@@ -1537,12 +1792,13 @@ mod tests {
         assert_eq!(result.error.as_ref().unwrap().code, "ExpectedTickMismatch");
     }
 
-    /// Commands queued during Running are applied at the correct tick.
+    /// Commands queued during Running are drained/sequenced at the correct
+    /// tick.  Per-command state application lands in P1-15+ (H2 stub).
     #[test]
     fn queued_command_applied_at_next_tick() {
         let (mut actor, _) = test_actor();
         actor.lifecycle = GameLifecycle::Running;
-        actor.state = Some(paused_state_at_tick0());
+        actor.state = Some(running_state_at_tick0());
 
         // Queue a command for tick 1
         let result = actor.handle_command(CommandEnvelope {
@@ -1568,7 +1824,7 @@ mod tests {
     fn queued_commands_sorted_by_sequence() {
         let (mut actor, _) = test_actor();
         actor.lifecycle = GameLifecycle::Running;
-        actor.state = Some(paused_state_at_tick0());
+        actor.state = Some(running_state_at_tick0());
 
         // Submit two commands for the same tick (tick 1)
         let r1 = actor.handle_command(CommandEnvelope {
@@ -1636,8 +1892,8 @@ mod tests {
         // The receipt for cmd_rec1 should still be present in the map
         assert!(actor.session_receipts.contains_key("cmd_rec1"));
 
-        // Replay cmd_rec1 while in Loading — lifecycle rejects gameplay
-        // commands, but the receipt remains for use after Loading completes.
+        // Replay cmd_rec1 — the exact retry returns the original receipt
+        // without recreating the effect (ADR-0008 §5 idempotency tombstone).
         let replay = actor.handle_command(CommandEnvelope {
             id: "cmd_rec1".to_string(),
             expected_tick: None,
@@ -1646,9 +1902,10 @@ mod tests {
                 priority: 3,
             },
         });
-        // Rejected because Loading disallows all commands
-        assert_eq!(replay.status, CommandStatus::Rejected);
-        // But the receipt is still in the map
+        // Idempotency hit — returns the original Applied receipt.
+        assert_eq!(replay.status, CommandStatus::Applied);
+        assert_eq!(replay.id, "cmd_rec1");
+        // The receipt is still in the map
         assert!(actor.session_receipts.contains_key("cmd_rec1"));
     }
 
@@ -1725,5 +1982,14 @@ mod tests {
             },
             command_log: Vec::new(),
         }
+    }
+
+    /// A canonical empty state at tick 0 with `Running` lifecycle, for tests
+    /// that exercise the Running queue (state.lifecycle must match the
+    /// actor lifecycle so the post-tick invariant check passes).
+    fn running_state_at_tick0() -> GameState {
+        let mut state = paused_state_at_tick0();
+        state.lifecycle = GameLifecycle::Running;
+        state
     }
 }

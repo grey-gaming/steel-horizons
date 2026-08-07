@@ -154,6 +154,11 @@ pub trait Migration: Send + Sync {
 }
 
 /// Registry that validates a contiguous migration chain.
+///
+/// NOTE (deferred, L5): this registry only *validates* the migration chain —
+/// it does not apply migrations to real save data.  Actual save migration is
+/// deferred to a later increment; do not mistake this validation-only registry
+/// for a live migrator.
 pub struct MigrationRegistry {
     current_schema_version: u32,
     migrations: Vec<Box<dyn Migration>>,
@@ -738,10 +743,9 @@ pub fn rebuild_pending_from_log(
 /// Seed session receipts from a loaded command log.
 pub fn seed_receipts_from_log(
     state: &GameState,
-) -> std::collections::BTreeMap<String, crate::actor::SessionReceipt> {
+) -> Result<std::collections::BTreeMap<String, crate::actor::SessionReceipt>, String> {
     use crate::actor::SessionReceipt;
     use crate::command::CommandStatus;
-    use std::hash::{Hash, Hasher};
 
     let mut receipts: std::collections::BTreeMap<String, SessionReceipt> =
         std::collections::BTreeMap::new();
@@ -753,15 +757,14 @@ pub fn seed_receipts_from_log(
             crate::types::CommandOutcome::Rejected => CommandStatus::Rejected,
         };
 
-        // Compute envelope hash for idempotency
+        // Compute the canonical envelope hash for idempotency (ADR-0006
+        // canonical v1 writer — deterministic, unlike DefaultHasher).
         let envelope = crate::command::CommandEnvelope {
             id: record.id.clone(),
             expected_tick: record.expected_tick,
             command: replayable_to_command(&record.command),
         };
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        envelope.hash(&mut hasher);
-        let env_hash = hasher.finish();
+        let env_hash = crate::command::envelope_canonical_hash(&envelope)?;
 
         receipts.insert(
             record.id.clone(),
@@ -778,7 +781,7 @@ pub fn seed_receipts_from_log(
         );
     }
 
-    receipts
+    Ok(receipts)
 }
 
 // ─── Timestamp formatting ──────────────────────────────────────────────

@@ -26,7 +26,7 @@ use tower_http::{
 
 use crate::actor::ActorMessage;
 use crate::command::CommandEnvelope;
-use crate::id::{BodyId, ShipId, StationId};
+use crate::id::{BodyId, BuildOrderId, ShipId, StationId, TechId};
 use crate::lifecycle::ServerStatus;
 use crate::types::GameLifecycle;
 
@@ -247,6 +247,20 @@ async fn handle_collection_item(
                         .get(&bid)
                         .map(|v| serde_json::to_value(v).unwrap())
                 }
+                "research" => {
+                    let tid = TechId(id.clone());
+                    state_ref
+                        .research_projects
+                        .get(&tid)
+                        .map(|v| serde_json::to_value(v).unwrap())
+                }
+                "build-orders" | "build_orders" => {
+                    let bid = BuildOrderId(id.clone());
+                    state_ref
+                        .build_orders
+                        .get(&bid)
+                        .map(|v| serde_json::to_value(v).unwrap())
+                }
                 _ => None,
             };
             match item {
@@ -282,15 +296,35 @@ async fn handle_command(
     Json(envelope): Json<CommandEnvelope>,
 ) -> impl IntoResponse {
     let response_tx = oneshot::channel();
-    state
+    if state
         .mailbox_tx
         .send(ActorMessage::SubmitCommand {
             envelope,
             response_tx: response_tx.0,
         })
-        .unwrap();
+        .is_err()
+    {
+        // Actor shut down while the request was in flight — surface a typed
+        // infrastructure error instead of panicking (TDD 02 / ADR-0003).
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            api_error("ServiceUnavailable", "command actor unavailable"),
+        )
+            .into_response();
+    }
 
-    let ack = response_tx.1.await.unwrap();
+    let ack = match response_tx.1.await {
+        Ok(ack) => ack,
+        Err(_) => {
+            // Oneshot dropped without a response — treat as an infrastructure
+            // failure with a typed envelope, never a panic.
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                api_error("InternalError", "command response channel closed"),
+            )
+                .into_response();
+        }
+    };
 
     let status_code = match ack.status {
         crate::command::CommandStatus::Accepted => StatusCode::ACCEPTED,
@@ -327,10 +361,15 @@ pub fn build_router(state: AppState) -> Router {
                         .to_str()
                         .ok()
                         .map(|s| {
-                            s.contains("127.0.0.1")
-                                || s.contains("localhost")
-                                || s.contains("::1")
-                                || s == "null"
+                            // Loopback-only: accept exactly http(s)://127.0.0.1[:port],
+                            // http(s)://localhost[:port], or http(s)://[::1][:port].
+                            // The host must match exactly — subdomains like
+                            // evil.localhost and the `null` origin are rejected.
+                            let host = s
+                                .strip_prefix("http://")
+                                .or_else(|| s.strip_prefix("https://"))
+                                .and_then(|rest| rest.split(':').next());
+                            matches!(host, Some("127.0.0.1") | Some("localhost") | Some("[::1]"))
                         })
                         .unwrap_or(false)
             },
@@ -412,6 +451,27 @@ mod tests {
         }
     }
 
+    /// Poll GET /api/v1/status until the server and actor are ready, instead
+    /// of a fixed sleep (L2). A successful status response implies the actor
+    /// has published an initial status. Timeout bounds the wait so a stuck
+    /// server fails fast rather than hanging.
+    async fn wait_ready(client: &reqwest::Client, addr: &std::net::SocketAddr) {
+        let url = format!("http://{addr}/api/v1/status");
+        for _ in 0..100 {
+            if client
+                .get(&url)
+                .send()
+                .await
+                .map(|r| r.status().is_success())
+                .unwrap_or(false)
+            {
+                return;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        panic!("API server did not become ready");
+    }
+
     /// Test that GET /api/v1/status returns a valid status response.
     #[tokio::test]
     async fn test_status_endpoint() {
@@ -423,10 +483,8 @@ mod tests {
             axum::serve(listener, router).await.unwrap();
         });
 
-        // Give the server a moment to start.
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-
         let client = reqwest::Client::new();
+        wait_ready(&client, &addr).await;
         let resp = client
             .get(format!("http://{}/api/v1/status", addr))
             .send()
@@ -583,6 +641,14 @@ mod tests {
     async fn test_command_newgame() {
         // Create the actor and API state, then spawn BOTH the actor and server.
         let catalog = load_test_content();
+        // Compute the canonical golden hash before `catalog` is moved into the
+        // actor (ADR-0006): the post-NewGame served state must match it exactly.
+        let canonical_golden_hash = crate::state_hash::format_state_hash(
+            &crate::state_hash::compute_state_hash(
+                &crate::state_construct::build_starting_state(&catalog).unwrap(),
+            )
+            .unwrap(),
+        );
         let (mut actor, mailbox_tx, snapshot_rx, status_rx) =
             crate::actor::SimulationActor::new(catalog);
         let state = AppState {
@@ -602,9 +668,9 @@ mod tests {
             actor.run().await;
         });
 
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-
         let client = reqwest::Client::new();
+        wait_ready(&client, &addr).await;
+
         let envelope = serde_json::json!({
             "id": "test-cmd-001",
             "command": {
@@ -621,7 +687,6 @@ mod tests {
             .unwrap();
         let status = resp.status();
         let body_text = resp.text().await.unwrap_or_default();
-        eprintln!("DEBUG command: status={}, body={:?}", status, body_text);
         // The actor accepts the NewGame command and applies it.
         assert_eq!(
             status,
@@ -630,9 +695,37 @@ mod tests {
             status,
             body_text
         );
-        if let Ok(body) = serde_json::from_str::<Value>(&body_text) {
-            assert_eq!(body["status"], "applied");
-        }
+        // Harden the envelope check: the body must parse and report `applied`.
+        let body: Value =
+            serde_json::from_str(&body_text).expect("command response must be valid JSON");
+        assert_eq!(body["status"], "applied");
+
+        // H1: post-NewGame, the served state must report `paused` at tick 0 and
+        // equal the canonical starting state — not just "applied".
+        let state_resp = client
+            .get(format!("http://{}/api/v1/state", addr))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(state_resp.status(), StatusCode::OK);
+        let state_body: Value =
+            serde_json::from_str(&state_resp.text().await.unwrap_or_default()).unwrap();
+        assert_eq!(
+            state_body["state"]["lifecycle"], "paused",
+            "post-NewGame lifecycle must be paused"
+        );
+        assert_eq!(state_body["state"]["tick"], 0);
+
+        // The canonical state hash (ADR-0006) must match the golden hash of the
+        // canonical starting state — proving NewGame loaded exactly that state.
+        let served: crate::state::GameState =
+            serde_json::from_value(state_body["state"].clone()).unwrap();
+        let served_hash = crate::state_hash::compute_state_hash(&served).unwrap();
+        assert_eq!(
+            crate::state_hash::format_state_hash(&served_hash),
+            canonical_golden_hash,
+            "post-NewGame state must equal the canonical golden state hash"
+        );
 
         server.abort();
         actor_handle.abort();

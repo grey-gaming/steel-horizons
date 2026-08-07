@@ -9,5 +9,5 @@ description = "Minimal Python client for the Steel Horizons engine REST API"
 requires-python = ">=3.10"
 dependencies = [
     "httpx >= 0.28",
-    "pydantic >= 2.0",
+    "platformdirs >= 4.0",
 ]

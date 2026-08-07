@@ -292,19 +292,19 @@ impl<'a> TickTransaction<'a> {
             match key.as_str() {
                 "lifecycle" => {
                     if let Some(v) = value {
-                        new_state.lifecycle =
-                            serde_json::from_str(v).unwrap_or(GameLifecycle::Paused);
+                        let parsed = serde_json::from_str::<GameLifecycle>(v).map_err(|e| {
+                            SimulationError::Phase(format!("invalid lifecycle root change: {e}"))
+                        })?;
+                        new_state.lifecycle = parsed;
                     }
                 }
                 "tick" => {
-                    if let Some(v) = value {
-                        if let Ok(n) = v.parse::<u64>() {
-                            new_state.tick = n;
-                        }
-                    }
+                    // `tick` is always advanced deterministically below; a root
+                    // change cannot override it (GDD 12 fixed tick advancement).
                 }
                 _ => {
-                    // Unknown root fields are silently ignored (future-proofing).
+                    // Unknown root fields are ignored as forward-compatible
+                    // future-proofing; they carry no behavioral contract yet.
                 }
             }
         }
@@ -320,19 +320,27 @@ impl<'a> TickTransaction<'a> {
                     let id_str = id_str.trim_start_matches('{').trim_end_matches('}');
                     match collection {
                         "stations" => {
-                            if let Ok(station) = serde_json::from_str::<Station>(json_str) {
-                                new_state
-                                    .stations
-                                    .insert(StationId(id_str.to_string()), station);
-                            }
+                            let station =
+                                serde_json::from_str::<Station>(json_str).map_err(|e| {
+                                    SimulationError::Phase(format!(
+                                        "invalid station entity change {id_str}: {e}"
+                                    ))
+                                })?;
+                            new_state
+                                .stations
+                                .insert(StationId(id_str.to_string()), station);
                         }
                         "ships" => {
-                            if let Ok(ship) = serde_json::from_str::<Ship>(json_str) {
-                                new_state.ships.insert(ShipId(id_str.to_string()), ship);
-                            }
+                            let ship = serde_json::from_str::<Ship>(json_str).map_err(|e| {
+                                SimulationError::Phase(format!(
+                                    "invalid ship entity change {id_str}: {e}"
+                                ))
+                            })?;
+                            new_state.ships.insert(ShipId(id_str.to_string()), ship);
                         }
                         _ => {
-                            // Other entity collections silently ignored.
+                            // Other entity collections are ignored as
+                            // forward-compatible future-proofing.
                         }
                     }
                 }
@@ -341,6 +349,31 @@ impl<'a> TickTransaction<'a> {
 
         // Advance tick counter.
         new_state.tick = self.tick + 1;
+
+        // ADR-0008 §2/§3: on a successful tick, every queued command whose
+        // effective tick is the newly committed tick transitions from
+        // Accepted to Applied.  The walking-skeleton phases currently apply
+        // no domain effect, so the recorded result is `CommandResult::None`;
+        // real results arrive with the phase implementations (P1-15+).
+        let committed_tick = new_state.tick;
+        for record in &mut new_state.command_log {
+            if record.outcome == CommandOutcome::Accepted
+                && record.application_boundary == CommandApplicationBoundary::ScheduledTick
+                && record.effective_tick == committed_tick
+            {
+                record.outcome = CommandOutcome::Applied;
+                record.result = Some(CommandResult::None);
+                record.rejection = None;
+            }
+        }
+
+        // Run invariant check on the post-application state before returning
+        // (ADR-0002 §Tick Transaction — the invariant must hold after the
+        // tick's effects are applied, not merely on the pre-tick state).
+        let invariants = crate::state_construct::check_invariants(&new_state);
+        if let Err(violations) = invariants {
+            return Err(SimulationError::Invariant(violations));
+        }
 
         // Collect events.
         let event_count = self.events.len() as u32;
@@ -370,7 +403,7 @@ pub fn phase_apply_scheduled_commands<'a>(
         return Ok(());
     }
 
-    // Sort by server_sequence for deterministic ordering.
+    // Sort by server_sequence for deterministic ordering (ADR-0003 §Command Sequencing).
     let mut sorted = commands;
     sorted.sort_by_key(|a| a.server_sequence);
 
@@ -387,75 +420,13 @@ pub fn phase_apply_scheduled_commands<'a>(
             }
         }
 
-        // Apply the command to the transaction — match only the variants
-        // that exist in the current Command enum.  Commands whose fields
-        // are not yet wired are silently accepted as placeholders.
-        match &envelope.command {
-            crate::command::Command::SetStationPriority {
-                station_id,
-                priority,
-            } => {
-                let key = format!("stations:{}.priority", station_id.0.as_str());
-                tx.write_root(&key, Some(priority.to_string()))?;
-            }
-            crate::command::Command::ConfigureBuffer {
-                station_id,
-                configuration,
-            } => {
-                let json = serde_json::to_string(configuration)
-                    .map_err(|e| SimulationError::Phase(format!("serialize: {}", e)))?;
-                let key = format!("stations:{}.buffer_config", station_id.0.as_str());
-                tx.write_root(&key, Some(json))?;
-            }
-            crate::command::Command::SetProductionRecipe {
-                station_id,
-                slot_index,
-                recipe_id,
-            } => {
-                let key = format!("stations:{}.recipes.{}", station_id.0.as_str(), slot_index);
-                let value = match recipe_id {
-                    Some(ref rid) => rid.0.as_str().to_string(),
-                    None => "null".to_string(),
-                };
-                tx.write_root(&key, Some(value))?;
-            }
-            crate::command::Command::SetMiningTarget {
-                station_id,
-                slot_index,
-                resource,
-            } => {
-                let key = format!("stations:{}.mining.{}", station_id.0.as_str(), slot_index);
-                let value = format!("{:?}", resource);
-                tx.write_root(&key, Some(value))?;
-            }
-            // Build/upgrade/demolish/scrap/gate commands — placeholders
-            crate::command::Command::QueueBuildShip { .. }
-            | crate::command::Command::QueueBuildStation { .. }
-            | crate::command::Command::QueueUpgrade { .. }
-            | crate::command::Command::CancelBuildOrder { .. }
-            | crate::command::Command::QueueDemolishStation { .. }
-            | crate::command::Command::ScrapShip { .. }
-            | crate::command::Command::BeginGateAssembly { .. } => {
-                // Placeholder — real effects in P1-15 through P1-25.
-            }
-            // Research commands — placeholders
-            crate::command::Command::QueueResearch { .. }
-            | crate::command::Command::PauseResearch { .. } => {
-                // Placeholder — real effects in P1-20.
-            }
-            // Survey commands — placeholders
-            crate::command::Command::QueueSurvey { .. }
-            | crate::command::Command::CancelSurveyOrder { .. } => {
-                // Placeholder — real effects in P1-21.
-            }
-            _ => {
-                // Control commands should not reach this phase.
-                return Err(SimulationError::Phase(format!(
-                    "unexpected command in scheduled phase: {}",
-                    envelope.id
-                )));
-            }
-        }
+        // Walking-skeleton stub: the command is drained from the schedule and
+        // recorded as Applied at commit (see TickTransaction::commit).  No
+        // domain effect is written yet — the real reducers land with the
+        // phase implementations (P1-15 through P1-25).  Do NOT write partial
+        // placeholder state here: ineffective writes would silently commit
+        // non-canonical values (e.g. Debug-formatted resource enums) that
+        // violate the authoritative GDD serialization.
     }
 
     Ok(())
@@ -600,13 +571,8 @@ pub fn advance_one_tick(state: &GameState, pending: Vec<SequencedCommand>) -> Ti
     // Phase 11 — Victory check
     phase_check_victory(&mut tx)?;
 
-    // Run invariant check before commit
-    let invariants = crate::state_construct::check_invariants(state);
-    if let Err(violations) = invariants {
-        return Err(SimulationError::Invariant(violations));
-    }
-
-    // Commit
+    // Commit.  The invariant check runs inside commit() on the
+    // post-application state (ADR-0002 §Tick Transaction).
     tx.commit()
 }
 

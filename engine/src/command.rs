@@ -364,6 +364,38 @@ pub struct CommandEnvelope {
     pub command: Command,
 }
 
+/// Deterministic structural fingerprint of a `CommandEnvelope`.
+///
+/// ADR-0006 canonical JSON v1 writer + domain-separated SHA-256, truncated to
+/// a u64 for the idempotency receipt.  Unlike `DefaultHasher` (randomly seeded
+/// per process), this value is stable across runs, so idempotency receipts
+/// survive save/load replay exactly.
+///
+/// Returns a typed error on serialization failure; it can only fail for an
+/// envelope that contains a non-canonical value (never for a valid envelope).
+pub fn envelope_canonical_hash(envelope: &CommandEnvelope) -> Result<u64, String> {
+    use sha2::{Digest, Sha256};
+    const DOMAIN: &[u8] = b"steel-horizons/envelope/sha256-canonical-json-v1";
+
+    let value = serde_json::to_value(envelope).map_err(|e| format!("envelope to_value: {e}"))?;
+    let bytes = crate::canonical::to_canonical_bytes(&value)
+        .map_err(|e| format!("envelope canonical bytes: {e}"))?;
+
+    let mut hasher = Sha256::new();
+    hasher.update(DOMAIN);
+    hasher.update([0x00]);
+    hasher.update(&bytes);
+    let digest = hasher.finalize();
+
+    // First 8 bytes as little-endian u64 (deterministic; the truncation is
+    // fine for idempotency keys, see ADR-0003 §Idempotency).
+    Ok(u64::from_le_bytes(
+        digest[0..8]
+            .try_into()
+            .map_err(|_| "digest too short".to_string())?,
+    ))
+}
+
 /// Acknowledgement returned after accepting a command envelope.
 #[derive(
     Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
