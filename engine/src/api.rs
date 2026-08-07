@@ -304,6 +304,15 @@ async fn handle_command(
 
 // ─── Router construction ──────────────────────────────────────────────
 
+/// Error response for unknown routes.
+async fn handle_404() -> impl IntoResponse {
+    (
+        StatusCode::NOT_FOUND,
+        api_error("NotFound", "Resource not found"),
+    )
+        .into_response()
+}
+
 /// Build the API router with all endpoints and middleware.
 ///
 /// The auth layer is only applied when `token` is non-empty.  For tests
@@ -339,6 +348,7 @@ pub fn build_router(state: AppState) -> Router {
             get(handle_collection_item),
         )
         .route("/api/v1/command", post(handle_command))
+        .fallback(handle_404)
         .layer(cors)
         .layer(RequestBodyLimitLayer::new(1024 * 1024))
         .layer(from_fn_with_state(state.clone(), auth_middleware))
@@ -628,7 +638,8 @@ mod tests {
         actor_handle.abort();
     }
 
-    /// Test error envelope format on 404.
+    /// Test error envelope format on 404 — unknown route.
+    /// The fallback handler returns NotFound error envelope.
     #[tokio::test]
     async fn test_404_error_envelope() {
         let state = make_test_state();
@@ -648,6 +659,10 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        let body: Value = resp.json().await.unwrap();
+        assert_eq!(body["protocol_version"], "v1");
+        assert_eq!(body["error"]["code"], "NotFound");
+        assert!(body["error"]["message"].is_string());
 
         server.abort();
     }
