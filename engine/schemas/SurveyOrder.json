@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SurveyOrder",
+  "description": "A survey order for a celestial body.",
+  "type": "object",
+  "properties": {
+    "assigned_ship_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ShipId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "body_id": {
+      "$ref": "#/$defs/BodyId"
+    },
+    "created_server_sequence": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "id": {
+      "$ref": "#/$defs/SurveyOrderId"
+    },
+    "priority": {
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
+    },
+    "state": {
+      "$ref": "#/$defs/SurveyOrderState"
+    },
+    "target_depth": {
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
+    },
+    "total_work": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "work_completed": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "body_id",
+    "target_depth",
+    "priority",
+    "created_server_sequence",
+    "work_completed",
+    "total_work",
+    "state"
+  ],
+  "$defs": {
+    "BodyId": {
+      "description": "Unique identifier for a celestial body (e.g. `planet_haven`).",
+      "type": "string"
+    },
+    "ShipId": {
+      "description": "Unique identifier for a ship (e.g. `ship_builder_1`).",
+      "type": "string"
+    },
+    "SurveyOrderId": {
+      "description": "Unique identifier for a survey order.",
+      "type": "string"
+    },
+    "SurveyOrderState": {
+      "description": "Survey order lifecycle states.",
+      "type": "string",
+      "enum": [
+        "queued",
+        "assigned",
+        "complete",
+        "cancelled"
+      ]
+    }
+  }
+}

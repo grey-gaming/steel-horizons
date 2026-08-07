@@ -1,0 +1,255 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StationDefinition",
+  "description": "A station definition in the content catalog.",
+  "type": "object",
+  "properties": {
+    "build_work": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "component_cost": {
+      "type": "object",
+      "properties": {
+        "alloys": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "carbonFiber": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "carbonSoil": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "cargoModule": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "chemicals": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "constructionBay": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "controlSystem": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "crystalDeposits": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "driveAssembly": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "frozenGases": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "fuel": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "gateNode": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "helium3": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "metalOre": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "metals": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "optics": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "powerCore": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "rareEarthMinerals": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "reactorRods": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "researchLab": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "siliconDust": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "siliconWafers": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "structuralFrame": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "volcanicSulfur": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "waterIce": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "default": {}
+    },
+    "required_tech": {
+      "$ref": "#/$defs/TechId"
+    },
+    "station_type": {
+      "$ref": "#/$defs/StationType"
+    },
+    "stats": {
+      "$ref": "#/$defs/StationStats"
+    },
+    "tier": {
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "station_type",
+    "tier",
+    "stats",
+    "build_work",
+    "required_tech"
+  ],
+  "$defs": {
+    "StationStats": {
+      "description": "Station statistics (type-dependent — see GDD 13 §Content Definitions).",
+      "type": "object",
+      "properties": {
+        "cargo_capacity": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "component_slots": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "docks": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "extraction_per_target_per_10_ticks": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "fuel_capacity": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "max_targets": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "production_slots": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "research_projects": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "shipyard_slots": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "docks",
+        "cargo_capacity",
+        "fuel_capacity",
+        "production_slots",
+        "max_targets",
+        "extraction_per_target_per_10_ticks",
+        "research_projects",
+        "shipyard_slots",
+        "component_slots"
+      ]
+    },
+    "StationType": {
+      "description": "Station type.",
+      "type": "string",
+      "enum": [
+        "hub",
+        "mining",
+        "refinery",
+        "construction",
+        "research"
+      ]
+    },
+    "TechId": {
+      "description": "Unique identifier for a technology.",
+      "type": "string"
+    }
+  }
+}

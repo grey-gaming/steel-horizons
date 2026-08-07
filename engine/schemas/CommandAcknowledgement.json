@@ -1,0 +1,307 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CommandAcknowledgement",
+  "description": "Acknowledgement returned after accepting a command envelope.",
+  "type": "object",
+  "properties": {
+    "accepted": {
+      "type": "boolean"
+    },
+    "effective_tick": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CommandRejection"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "game_state": {
+      "$ref": "#/$defs/GameLifecycle"
+    },
+    "id": {
+      "type": "string"
+    },
+    "protocol_version": {
+      "type": "string"
+    },
+    "result": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CommandResult"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "resulting_tick": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "server_sequence": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "status": {
+      "$ref": "#/$defs/CommandStatus"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "protocol_version",
+    "id",
+    "accepted",
+    "status",
+    "server_sequence",
+    "game_state"
+  ],
+  "$defs": {
+    "BuildOrderId": {
+      "description": "Unique identifier for a build order.",
+      "type": "string"
+    },
+    "CommandRejection": {
+      "description": "Structured rejection information for a failed command.",
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "details": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ErrorDetail"
+          },
+          "default": {}
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message"
+      ]
+    },
+    "CommandResult": {
+      "description": "Result payload produced by an accepted or applied command.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "none"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "order_id": {
+              "$ref": "#/$defs/BuildOrderId"
+            },
+            "type": {
+              "type": "string",
+              "const": "buildOrderCreated"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "order_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "order_id": {
+              "$ref": "#/$defs/SurveyOrderId"
+            },
+            "type": {
+              "type": "string",
+              "const": "surveyOrderCreated"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "order_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tech_id": {
+              "$ref": "#/$defs/TechId"
+            },
+            "type": {
+              "type": "string",
+              "const": "researchProjectCreated"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "tech_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tech_id": {
+              "$ref": "#/$defs/TechId"
+            },
+            "type": {
+              "type": "string",
+              "const": "researchProjectUpdated"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "tech_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "gateAssemblyStarted"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "resulting_tick": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "type": {
+              "type": "string",
+              "const": "advanceTicksCompleted"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "resulting_tick"
+          ]
+        }
+      ]
+    },
+    "CommandStatus": {
+      "description": "The status of a command after processing.",
+      "type": "string",
+      "enum": [
+        "accepted",
+        "applied",
+        "rejected",
+        "failed"
+      ]
+    },
+    "ErrorDetail": {
+      "description": "Typed error detail values.\n\nPer GDD 13, `ErrorDetail` can be a string, bool, integer, null, or\narrays of strings or integers.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          }
+        }
+      ]
+    },
+    "GameLifecycle": {
+      "description": "Lifecycle states of the game session.",
+      "oneOf": [
+        {
+          "description": "No game is loaded; actor has no mutable state.",
+          "type": "string",
+          "const": "unloaded"
+        },
+        {
+          "description": "A load or new-game operation is in progress; state is not yet available.",
+          "type": "string",
+          "const": "loading"
+        },
+        {
+          "description": "Game is loaded but paused; commands and batch ticks are accepted.",
+          "type": "string",
+          "const": "paused"
+        },
+        {
+          "description": "Game is running with real-time scheduler ticks; commands and pause are accepted.",
+          "type": "string",
+          "const": "running"
+        },
+        {
+          "description": "A batch of ticks is being advanced; no commands or scheduler ticks are accepted.",
+          "type": "string",
+          "const": "advancing"
+        },
+        {
+          "description": "Gate victory has been achieved; no further mutation is possible.",
+          "type": "string",
+          "const": "won"
+        }
+      ]
+    },
+    "SurveyOrderId": {
+      "description": "Unique identifier for a survey order.",
+      "type": "string"
+    },
+    "TechId": {
+      "description": "Unique identifier for a technology.",
+      "type": "string"
+    }
+  }
+}

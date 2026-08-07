@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BottleneckTracker",
+  "description": "Rolling-window bottleneck tracker for a station/resource pair.",
+  "type": "object",
+  "properties": {
+    "consecutive_clear_ticks": {
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
+    "consecutive_deficit_ticks": {
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
+    "cursor": {
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
+    "deliveries_by_tick": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 0
+      }
+    },
+    "rolling_delivered": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "warning_active": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "cursor",
+    "rolling_delivered",
+    "consecutive_deficit_ticks",
+    "consecutive_clear_ticks",
+    "warning_active"
+  ]
+}

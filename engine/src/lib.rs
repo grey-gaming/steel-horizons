@@ -67,5 +67,8 @@ pub mod persistence;
 /// Simulation actor — sole mutable GameState owner.
 pub mod actor;
 
+/// Axum REST API server and handlers.
+pub mod api;
+
 /// Convenience re-export of the engine version.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

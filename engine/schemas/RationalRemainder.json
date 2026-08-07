@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RationalRemainder",
+  "description": "Rational remainder for accumulator-based resource consumption.",
+  "type": "object",
+  "properties": {
+    "denominator": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "value": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "value",
+    "denominator"
+  ]
+}

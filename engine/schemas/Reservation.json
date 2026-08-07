@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Reservation",
+  "description": "A logistics reservation for cargo transport.",
+  "type": "object",
+  "properties": {
+    "amount": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "demand_destination": {
+      "$ref": "#/$defs/InventoryDestinationRef"
+    },
+    "id": {
+      "$ref": "#/$defs/ReservationId"
+    },
+    "pickup_expiry_tick": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "resource": {
+      "$ref": "#/$defs/ResourceType"
+    },
+    "ship_id": {
+      "$ref": "#/$defs/ShipId"
+    },
+    "state": {
+      "$ref": "#/$defs/ReservationState"
+    },
+    "supply_source": {
+      "$ref": "#/$defs/InventorySourceRef"
+    },
+    "tick_assigned": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "ship_id",
+    "supply_source",
+    "demand_destination",
+    "resource",
+    "amount",
+    "state",
+    "tick_assigned"
+  ],
+  "$defs": {
+    "BuildOrderId": {
+      "description": "Unique identifier for a build order.",
+      "type": "string"
+    },
+    "InventoryDestinationRef": {
+      "description": "A destination for cargo delivery (inventory transfers).",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "station_id": {
+              "$ref": "#/$defs/StationId"
+            },
+            "type": {
+              "type": "string",
+              "const": "station"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "station_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "order_id": {
+              "$ref": "#/$defs/BuildOrderId"
+            },
+            "type": {
+              "type": "string",
+              "const": "buildOrder"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "order_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "order_id": {
+              "$ref": "#/$defs/BuildOrderId"
+            },
+            "type": {
+              "type": "string",
+              "const": "evacuation"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "order_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "gateSite"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "InventorySourceRef": {
+      "description": "A source for cargo pickup.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "station_id": {
+              "$ref": "#/$defs/StationId"
+            },
+            "type": {
+              "type": "string",
+              "const": "station"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "station_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "salvage_id": {
+              "$ref": "#/$defs/SalvageId"
+            },
+            "type": {
+              "type": "string",
+              "const": "salvage"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "salvage_id"
+          ]
+        }
+      ]
+    },
+    "ReservationId": {
+      "description": "Unique identifier for a logistics reservation.",
+      "type": "string"
+    },
+    "ReservationState": {
+      "description": "Reservation lifecycle states.",
+      "type": "string",
+      "enum": [
+        "awaitingPickup",
+        "loaded",
+        "delivered",
+        "released"
+      ]
+    },
+    "ResourceType": {
+      "description": "The 25 resource types in canonical order (raw, refined, component).\n\nSerialized as a camelCase string (e.g. `\"metalOre\"`).  This enum's\n`Ord` follows the GDD 14 resource catalog order so that sparse maps\niterate deterministically.",
+      "type": "string",
+      "enum": [
+        "metalOre",
+        "carbonSoil",
+        "siliconDust",
+        "volcanicSulfur",
+        "waterIce",
+        "frozenGases",
+        "helium3",
+        "rareEarthMinerals",
+        "crystalDeposits",
+        "metals",
+        "carbonFiber",
+        "siliconWafers",
+        "chemicals",
+        "fuel",
+        "alloys",
+        "optics",
+        "reactorRods",
+        "structuralFrame",
+        "powerCore",
+        "controlSystem",
+        "driveAssembly",
+        "cargoModule",
+        "researchLab",
+        "constructionBay",
+        "gateNode"
+      ]
+    },
+    "SalvageId": {
+      "description": "Unique identifier for a salvage cache.",
+      "type": "string"
+    },
+    "ShipId": {
+      "description": "Unique identifier for a ship (e.g. `ship_builder_1`).",
+      "type": "string"
+    },
+    "StationId": {
+      "description": "Unique identifier for a station (e.g. `hub_haven`).",
+      "type": "string"
+    }
+  }
+}

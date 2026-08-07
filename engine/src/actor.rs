@@ -112,7 +112,7 @@ pub struct SimulationActor {
     /// Loading progress during the Loading lifecycle.
     loading: Option<LoadingStatus>,
     /// The loaded content catalog.
-    content: Arc<ContentCatalog>,
+    pub content: Arc<ContentCatalog>,
     /// Pending commands scheduled at future ticks.
     pending_commands: BTreeMap<u64, Vec<SequencedCommand>>,
     /// Session receipt ledger for idempotency.

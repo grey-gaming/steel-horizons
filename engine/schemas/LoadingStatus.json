@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LoadingStatus",
+  "description": "Progress reported during the Loading lifecycle.",
+  "type": "object",
+  "properties": {
+    "operation": {
+      "description": "The loading operation being performed.",
+      "$ref": "#/$defs/LoadingOperation"
+    },
+    "stage": {
+      "description": "The current stage within the loading operation.",
+      "$ref": "#/$defs/LoadingStage"
+    }
+  },
+  "required": [
+    "operation",
+    "stage"
+  ],
+  "$defs": {
+    "LoadingOperation": {
+      "description": "The operation being performed during Loading.",
+      "oneOf": [
+        {
+          "description": "Constructing a new game from a scenario.",
+          "type": "string",
+          "const": "NewGame"
+        },
+        {
+          "description": "Loading a saved game from disk.",
+          "type": "string",
+          "const": "LoadAutosave"
+        },
+        {
+          "description": "Initial autoload at server startup.",
+          "type": "string",
+          "const": "StartupAutoload"
+        }
+      ]
+    },
+    "LoadingStage": {
+      "description": "The stage within a loading operation.",
+      "oneOf": [
+        {
+          "description": "Validating content definitions.",
+          "type": "string",
+          "const": "ValidatingContent"
+        },
+        {
+          "description": "Constructing starting scenario state.",
+          "type": "string",
+          "const": "ConstructingScenario"
+        },
+        {
+          "description": "Reading save file from disk.",
+          "type": "string",
+          "const": "ReadingSave"
+        },
+        {
+          "description": "Verifying save envelope integrity.",
+          "type": "string",
+          "const": "VerifyingEnvelope"
+        },
+        {
+          "description": "Running schema migrations.",
+          "type": "string",
+          "const": "Migrating"
+        },
+        {
+          "description": "Validating deserialized state invariants.",
+          "type": "string",
+          "const": "ValidatingState"
+        },
+        {
+          "description": "Publishing the new state and transitioning lifecycle.",
+          "type": "string",
+          "const": "Publishing"
+        }
+      ]
+    }
+  }
+}

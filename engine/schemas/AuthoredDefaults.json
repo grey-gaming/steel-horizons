@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AuthoredDefaults",
+  "description": "Authored default constants for new stations, buffers, work, etc.",
+  "type": "object",
+  "properties": {
+    "demolition_work": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "fuel_demand_threshold": {
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
+    },
+    "fuel_export_threshold": {
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
+    },
+    "general_buffer_preferred_maximum": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "hub_shipyard_work_per_tick": {
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
+    "input_demand_threshold": {
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
+    },
+    "mining_retune_ticks": {
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
+    "new_station_priority": {
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
+    },
+    "output_export_threshold": {
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
+    },
+    "survey_depth_work": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 0
+      },
+      "maxItems": 3,
+      "minItems": 3
+    },
+    "upgrade_work_per_tier": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "new_station_priority",
+    "general_buffer_preferred_maximum",
+    "input_demand_threshold",
+    "output_export_threshold",
+    "fuel_demand_threshold",
+    "fuel_export_threshold",
+    "mining_retune_ticks",
+    "upgrade_work_per_tier",
+    "demolition_work",
+    "survey_depth_work",
+    "hub_shipyard_work_per_tick"
+  ]
+}

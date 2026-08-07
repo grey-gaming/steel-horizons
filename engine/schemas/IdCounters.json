@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "IdCounters",
+  "description": "Monotonically increasing ID counters per entity kind.",
+  "type": "object",
+  "properties": {
+    "build_order": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "reservation": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "salvage": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "ship": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "station": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "survey_order": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "ship",
+    "station",
+    "build_order",
+    "reservation",
+    "salvage",
+    "survey_order"
+  ]
+}

@@ -1,0 +1,529 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GateDefinition",
+  "description": "The authored Space Gate definition.",
+  "type": "object",
+  "properties": {
+    "logistics_priority": {
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
+    },
+    "manifest": {
+      "type": "object",
+      "properties": {
+        "alloys": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "carbonFiber": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "carbonSoil": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "cargoModule": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "chemicals": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "constructionBay": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "controlSystem": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "crystalDeposits": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "driveAssembly": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "frozenGases": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "fuel": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "gateNode": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "helium3": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "metalOre": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "metals": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "optics": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "powerCore": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "rareEarthMinerals": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "reactorRods": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "researchLab": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "siliconDust": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "siliconWafers": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "structuralFrame": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "volcanicSulfur": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "waterIce": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "default": {}
+    },
+    "minimum_fabricator_tier": {
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
+    },
+    "phases": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/GatePhaseDefinition"
+      }
+    },
+    "required_fabricator_role": {
+      "$ref": "#/$defs/ShipRole"
+    },
+    "required_techs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/TechId"
+      }
+    },
+    "site_position": {
+      "$ref": "#/$defs/SystemPosition"
+    },
+    "transfer_berths": {
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "site_position",
+    "required_techs",
+    "required_fabricator_role",
+    "minimum_fabricator_tier",
+    "logistics_priority",
+    "transfer_berths",
+    "phases"
+  ],
+  "$defs": {
+    "GatePhase": {
+      "description": "Space Gate assembly phases.",
+      "type": "string",
+      "enum": [
+        "sitePreparation",
+        "frameAssembly",
+        "powerIntegration",
+        "activation"
+      ]
+    },
+    "GatePhaseDefinition": {
+      "description": "One phase of the Space Gate assembly process.",
+      "type": "object",
+      "properties": {
+        "completion_consumption": {
+          "type": "object",
+          "properties": {
+            "alloys": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "carbonFiber": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "carbonSoil": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "cargoModule": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "chemicals": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "constructionBay": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "controlSystem": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "crystalDeposits": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "driveAssembly": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "frozenGases": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "fuel": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "gateNode": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "helium3": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "metalOre": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "metals": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "optics": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "powerCore": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "rareEarthMinerals": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "reactorRods": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "researchLab": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "siliconDust": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "siliconWafers": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "structuralFrame": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "volcanicSulfur": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "waterIce": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false,
+          "default": {}
+        },
+        "phase": {
+          "$ref": "#/$defs/GatePhase"
+        },
+        "required_deliveries": {
+          "type": "object",
+          "properties": {
+            "alloys": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "carbonFiber": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "carbonSoil": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "cargoModule": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "chemicals": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "constructionBay": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "controlSystem": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "crystalDeposits": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "driveAssembly": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "frozenGases": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "fuel": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "gateNode": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "helium3": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "metalOre": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "metals": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "optics": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "powerCore": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "rareEarthMinerals": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "reactorRods": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "researchLab": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "siliconDust": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "siliconWafers": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "structuralFrame": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "volcanicSulfur": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "waterIce": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false,
+          "default": {}
+        },
+        "work": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "phase",
+        "work"
+      ]
+    },
+    "LaneId": {
+      "description": "Orbital lane identifiers in increasing orbital radius order.",
+      "type": "string",
+      "enum": [
+        "inner",
+        "habitable",
+        "outer",
+        "fringe"
+      ]
+    },
+    "ShipRole": {
+      "description": "Role of a ship.",
+      "type": "string",
+      "enum": [
+        "cargo",
+        "construction",
+        "research"
+      ]
+    },
+    "SystemPosition": {
+      "description": "A position within the system: lane, orbital radius, and angle.",
+      "type": "object",
+      "properties": {
+        "angle_milli": {
+          "description": "Normalized 0..6282 milliradians (π × 2000).",
+          "type": "integer",
+          "format": "int32"
+        },
+        "lane_id": {
+          "$ref": "#/$defs/LaneId"
+        },
+        "radius_units": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "lane_id",
+        "radius_units",
+        "angle_milli"
+      ]
+    },
+    "TechId": {
+      "description": "Unique identifier for a technology.",
+      "type": "string"
+    }
+  }
+}

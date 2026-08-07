@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CelestialBody",
+  "description": "A celestial body (planet, moon, or asteroid belt).",
+  "type": "object",
+  "properties": {
+    "body_type": {
+      "$ref": "#/$defs/BodyType"
+    },
+    "deposits": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ResourceDeposit"
+      }
+    },
+    "id": {
+      "$ref": "#/$defs/BodyId"
+    },
+    "name": {
+      "type": "string"
+    },
+    "orbit_ring_count": {
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
+    },
+    "parent_body_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BodyId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "position": {
+      "$ref": "#/$defs/SystemPosition"
+    },
+    "slot_counts": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "integer",
+        "format": "uint8",
+        "maximum": 255,
+        "minimum": 0
+      }
+    },
+    "subtype": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PlanetSubtype"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "survey_depth": {
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "body_type",
+    "position",
+    "survey_depth",
+    "orbit_ring_count"
+  ],
+  "$defs": {
+    "BodyId": {
+      "description": "Unique identifier for a celestial body (e.g. `planet_haven`).",
+      "type": "string"
+    },
+    "BodyType": {
+      "description": "Celestial body type.",
+      "type": "string",
+      "enum": [
+        "planet",
+        "moon",
+        "asteroidBelt"
+      ]
+    },
+    "LaneId": {
+      "description": "Orbital lane identifiers in increasing orbital radius order.",
+      "type": "string",
+      "enum": [
+        "inner",
+        "habitable",
+        "outer",
+        "fringe"
+      ]
+    },
+    "PlanetSubtype": {
+      "description": "Sub-type for planets.",
+      "type": "string",
+      "enum": [
+        "rockyTerran",
+        "volcanic",
+        "iceWorld",
+        "gasGiant"
+      ]
+    },
+    "ResourceDeposit": {
+      "description": "A resource deposit on a celestial body.",
+      "type": "object",
+      "properties": {
+        "baseline": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "current": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "minimum_survey_depth": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "renewable": {
+          "type": "boolean"
+        },
+        "resource": {
+          "$ref": "#/$defs/ResourceType"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "resource",
+        "current",
+        "baseline",
+        "renewable",
+        "minimum_survey_depth"
+      ]
+    },
+    "ResourceType": {
+      "description": "The 25 resource types in canonical order (raw, refined, component).\n\nSerialized as a camelCase string (e.g. `\"metalOre\"`).  This enum's\n`Ord` follows the GDD 14 resource catalog order so that sparse maps\niterate deterministically.",
+      "type": "string",
+      "enum": [
+        "metalOre",
+        "carbonSoil",
+        "siliconDust",
+        "volcanicSulfur",
+        "waterIce",
+        "frozenGases",
+        "helium3",
+        "rareEarthMinerals",
+        "crystalDeposits",
+        "metals",
+        "carbonFiber",
+        "siliconWafers",
+        "chemicals",
+        "fuel",
+        "alloys",
+        "optics",
+        "reactorRods",
+        "structuralFrame",
+        "powerCore",
+        "controlSystem",
+        "driveAssembly",
+        "cargoModule",
+        "researchLab",
+        "constructionBay",
+        "gateNode"
+      ]
+    },
+    "SystemPosition": {
+      "description": "A position within the system: lane, orbital radius, and angle.",
+      "type": "object",
+      "properties": {
+        "angle_milli": {
+          "description": "Normalized 0..6282 milliradians (π × 2000).",
+          "type": "integer",
+          "format": "int32"
+        },
+        "lane_id": {
+          "$ref": "#/$defs/LaneId"
+        },
+        "radius_units": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "lane_id",
+        "radius_units",
+        "angle_milli"
+      ]
+    }
+  }
+}

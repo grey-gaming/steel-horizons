@@ -1,0 +1,271 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TechDefinition",
+  "description": "A technology definition (tier, prerequisites, cost, duration, unlocks).",
+  "type": "object",
+  "properties": {
+    "costs": {
+      "type": "object",
+      "properties": {
+        "alloys": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "carbonFiber": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "carbonSoil": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "cargoModule": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "chemicals": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "constructionBay": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "controlSystem": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "crystalDeposits": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "driveAssembly": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "frozenGases": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "fuel": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "gateNode": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "helium3": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "metalOre": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "metals": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "optics": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "powerCore": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "rareEarthMinerals": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "reactorRods": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "researchLab": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "siliconDust": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "siliconWafers": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "structuralFrame": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "volcanicSulfur": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "waterIce": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "default": {}
+    },
+    "duration_ticks": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "id": {
+      "$ref": "#/$defs/TechId"
+    },
+    "mechanic_unlocks": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/MechanicUnlock"
+      }
+    },
+    "prerequisites": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/TechId"
+      }
+    },
+    "tier": {
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "tier",
+    "duration_ticks"
+  ],
+  "$defs": {
+    "MechanicUnlock": {
+      "description": "Mechanic unlock granted by a technology.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "max_depth": {
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            },
+            "type": {
+              "type": "string",
+              "const": "surveyDepth"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "max_depth"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "asteroidBeltOperations"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "denominator": {
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            },
+            "numerator": {
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            },
+            "type": {
+              "type": "string",
+              "const": "lifeSupportFuelFactor"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "numerator",
+            "denominator"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "gateSiteVisibility"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "gateAssembly"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "TechId": {
+      "description": "Unique identifier for a technology.",
+      "type": "string"
+    }
+  }
+}

@@ -16,6 +16,7 @@ use std::path::PathBuf;
 
 use steel_horizons_engine::command::*;
 use steel_horizons_engine::content::*;
+use steel_horizons_engine::lifecycle::*;
 use steel_horizons_engine::state::*;
 
 /// Generate a schema file at `dest` for concrete type `T`.
@@ -190,5 +191,17 @@ fn main() {
         CommandAcknowledgement
     );
 
-    eprintln!("[schema_export] Done — 35 schemas generated.");
+    // ── Lifecycle / API DTOs ──
+    write_schema!(
+        &out_dir.join("ServerStatus.json"),
+        "ServerStatus",
+        ServerStatus
+    );
+    write_schema!(
+        &out_dir.join("LoadingStatus.json"),
+        "LoadingStatus",
+        LoadingStatus
+    );
+
+    eprintln!("[schema_export] Done — 37 schemas generated.");
 }

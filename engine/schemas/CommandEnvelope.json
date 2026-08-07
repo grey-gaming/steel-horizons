@@ -1,0 +1,669 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CommandEnvelope",
+  "description": "The strict command envelope for all API commands.",
+  "type": "object",
+  "properties": {
+    "command": {
+      "$ref": "#/$defs/Command"
+    },
+    "expected_tick": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "id": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "command"
+  ],
+  "$defs": {
+    "BodyId": {
+      "description": "Unique identifier for a celestial body (e.g. `planet_haven`).",
+      "type": "string"
+    },
+    "BufferConfiguration": {
+      "description": "Buffer configuration for a station's input, output, or fuel buffer.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "demand_threshold": {
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            },
+            "kind": {
+              "type": "string",
+              "const": "input"
+            },
+            "max": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "resource": {
+              "$ref": "#/$defs/ResourceType"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "resource",
+            "max",
+            "demand_threshold"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "export_threshold": {
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            },
+            "kind": {
+              "type": "string",
+              "const": "output"
+            },
+            "max": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "resource": {
+              "$ref": "#/$defs/ResourceType"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "resource",
+            "max",
+            "export_threshold"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "demand_threshold": {
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            },
+            "export_threshold": {
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            },
+            "kind": {
+              "type": "string",
+              "const": "fuel"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "demand_threshold",
+            "export_threshold"
+          ]
+        }
+      ]
+    },
+    "BuildOrderId": {
+      "description": "Unique identifier for a build order.",
+      "type": "string"
+    },
+    "Command": {
+      "description": "The complete command union (actor controls + replayable game commands).",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "scenario_id": {
+              "$ref": "#/$defs/ScenarioId"
+            },
+            "type": {
+              "type": "string",
+              "const": "newGame"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "scenario_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "loadAutosave"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "saveNow"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "pause"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "resume"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "count": {
+              "type": "integer",
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0
+            },
+            "type": {
+              "type": "string",
+              "const": "advanceTicks"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "count"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "hub_id": {
+              "$ref": "#/$defs/StationId"
+            },
+            "role": {
+              "$ref": "#/$defs/ShipRole"
+            },
+            "tier": {
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            },
+            "type": {
+              "type": "string",
+              "const": "queueBuildShip"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "hub_id",
+            "role",
+            "tier"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "body_id": {
+              "$ref": "#/$defs/BodyId"
+            },
+            "orbit_ring": {
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            },
+            "slot": {
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            },
+            "source_hub_id": {
+              "$ref": "#/$defs/StationId"
+            },
+            "station_type": {
+              "$ref": "#/$defs/StationType"
+            },
+            "tier": {
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            },
+            "type": {
+              "type": "string",
+              "const": "queueBuildStation"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "source_hub_id",
+            "body_id",
+            "orbit_ring",
+            "slot",
+            "station_type",
+            "tier"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "source_hub_id": {
+              "$ref": "#/$defs/StationId"
+            },
+            "station_id": {
+              "$ref": "#/$defs/StationId"
+            },
+            "target_tier": {
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            },
+            "type": {
+              "type": "string",
+              "const": "queueUpgrade"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "source_hub_id",
+            "station_id",
+            "target_tier"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "order_id": {
+              "$ref": "#/$defs/BuildOrderId"
+            },
+            "type": {
+              "type": "string",
+              "const": "cancelBuildOrder"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "order_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "recovery_hub_id": {
+              "$ref": "#/$defs/StationId"
+            },
+            "station_id": {
+              "$ref": "#/$defs/StationId"
+            },
+            "type": {
+              "type": "string",
+              "const": "queueDemolishStation"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "station_id",
+            "recovery_hub_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ship_id": {
+              "$ref": "#/$defs/ShipId"
+            },
+            "type": {
+              "type": "string",
+              "const": "scrapShip"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "ship_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "fabricator_ship_id": {
+              "$ref": "#/$defs/ShipId"
+            },
+            "type": {
+              "type": "string",
+              "const": "beginGateAssembly"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "fabricator_ship_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "priority": {
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            },
+            "station_id": {
+              "$ref": "#/$defs/StationId"
+            },
+            "type": {
+              "type": "string",
+              "const": "setStationPriority"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "station_id",
+            "priority"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "configuration": {
+              "$ref": "#/$defs/BufferConfiguration"
+            },
+            "station_id": {
+              "$ref": "#/$defs/StationId"
+            },
+            "type": {
+              "type": "string",
+              "const": "configureBuffer"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "station_id",
+            "configuration"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "recipe_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/RecipeId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "slot_index": {
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            },
+            "station_id": {
+              "$ref": "#/$defs/StationId"
+            },
+            "type": {
+              "type": "string",
+              "const": "setProductionRecipe"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "station_id",
+            "slot_index"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "resource": {
+              "$ref": "#/$defs/ResourceType"
+            },
+            "slot_index": {
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            },
+            "station_id": {
+              "$ref": "#/$defs/StationId"
+            },
+            "type": {
+              "type": "string",
+              "const": "setMiningTarget"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "station_id",
+            "slot_index",
+            "resource"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "facility_id": {
+              "$ref": "#/$defs/StationId"
+            },
+            "tech_id": {
+              "$ref": "#/$defs/TechId"
+            },
+            "type": {
+              "type": "string",
+              "const": "queueResearch"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "facility_id",
+            "tech_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "release_unused": {
+              "type": "boolean"
+            },
+            "tech_id": {
+              "$ref": "#/$defs/TechId"
+            },
+            "type": {
+              "type": "string",
+              "const": "pauseResearch"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "tech_id",
+            "release_unused"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "body_id": {
+              "$ref": "#/$defs/BodyId"
+            },
+            "priority": {
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            },
+            "target_depth": {
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            },
+            "type": {
+              "type": "string",
+              "const": "queueSurvey"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "body_id",
+            "target_depth",
+            "priority"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "order_id": {
+              "$ref": "#/$defs/SurveyOrderId"
+            },
+            "type": {
+              "type": "string",
+              "const": "cancelSurveyOrder"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "order_id"
+          ]
+        }
+      ]
+    },
+    "RecipeId": {
+      "description": "Unique identifier for a recipe.",
+      "type": "string"
+    },
+    "ResourceType": {
+      "description": "The 25 resource types in canonical order (raw, refined, component).\n\nSerialized as a camelCase string (e.g. `\"metalOre\"`).  This enum's\n`Ord` follows the GDD 14 resource catalog order so that sparse maps\niterate deterministically.",
+      "type": "string",
+      "enum": [
+        "metalOre",
+        "carbonSoil",
+        "siliconDust",
+        "volcanicSulfur",
+        "waterIce",
+        "frozenGases",
+        "helium3",
+        "rareEarthMinerals",
+        "crystalDeposits",
+        "metals",
+        "carbonFiber",
+        "siliconWafers",
+        "chemicals",
+        "fuel",
+        "alloys",
+        "optics",
+        "reactorRods",
+        "structuralFrame",
+        "powerCore",
+        "controlSystem",
+        "driveAssembly",
+        "cargoModule",
+        "researchLab",
+        "constructionBay",
+        "gateNode"
+      ]
+    },
+    "ScenarioId": {
+      "description": "Unique identifier for a starting scenario.",
+      "type": "string"
+    },
+    "ShipId": {
+      "description": "Unique identifier for a ship (e.g. `ship_builder_1`).",
+      "type": "string"
+    },
+    "ShipRole": {
+      "description": "Role of a ship.",
+      "type": "string",
+      "enum": [
+        "cargo",
+        "construction",
+        "research"
+      ]
+    },
+    "StationId": {
+      "description": "Unique identifier for a station (e.g. `hub_haven`).",
+      "type": "string"
+    },
+    "StationType": {
+      "description": "Station type.",
+      "type": "string",
+      "enum": [
+        "hub",
+        "mining",
+        "refinery",
+        "construction",
+        "research"
+      ]
+    },
+    "SurveyOrderId": {
+      "description": "Unique identifier for a survey order.",
+      "type": "string"
+    },
+    "TechId": {
+      "description": "Unique identifier for a technology.",
+      "type": "string"
+    }
+  }
+}

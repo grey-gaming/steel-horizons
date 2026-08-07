@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SystemPosition",
+  "description": "A position within the system: lane, orbital radius, and angle.",
+  "type": "object",
+  "properties": {
+    "angle_milli": {
+      "description": "Normalized 0..6282 milliradians (π × 2000).",
+      "type": "integer",
+      "format": "int32"
+    },
+    "lane_id": {
+      "$ref": "#/$defs/LaneId"
+    },
+    "radius_units": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "lane_id",
+    "radius_units",
+    "angle_milli"
+  ],
+  "$defs": {
+    "LaneId": {
+      "description": "Orbital lane identifiers in increasing orbital radius order.",
+      "type": "string",
+      "enum": [
+        "inner",
+        "habitable",
+        "outer",
+        "fringe"
+      ]
+    }
+  }
+}

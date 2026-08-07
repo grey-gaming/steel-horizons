@@ -12,13 +12,16 @@
 //! - TDD 00 §Simulation Actor
 //! - TDD 02 §Queries, §Errors
 
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
 use crate::state::*;
 use crate::types::*;
 
 // ─── Loading status ───────────────────────────────────────────────────
 
 /// The operation being performed during Loading.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub enum LoadingOperation {
     /// Constructing a new game from a scenario.
     NewGame,
@@ -29,7 +32,7 @@ pub enum LoadingOperation {
 }
 
 /// The stage within a loading operation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub enum LoadingStage {
     /// Validating content definitions.
     ValidatingContent,
@@ -48,7 +51,7 @@ pub enum LoadingStage {
 }
 
 /// Progress reported during the Loading lifecycle.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct LoadingStatus {
     /// The loading operation being performed.
     pub operation: LoadingOperation,
@@ -59,7 +62,7 @@ pub struct LoadingStatus {
 // ─── Server status ───────────────────────────────────────────────────
 
 /// Runtime status published by the actor for query endpoints.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, JsonSchema)]
 pub struct ServerStatus {
     /// Protocol version string.
     pub protocol_version: String,

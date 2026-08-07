@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TravelSegment",
+  "description": "One segment of a ship's travel plan.",
+  "type": "object",
+  "properties": {
+    "arc_direction": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ArcDirection"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "kind": {
+      "$ref": "#/$defs/TravelSegmentKind"
+    },
+    "lane_id": {
+      "$ref": "#/$defs/LaneId"
+    },
+    "life_support_eligible": {
+      "type": "boolean"
+    },
+    "remaining_distance_milli": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "speed_multiplier_den": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "speed_multiplier_num": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "total_distance_milli": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "lane_id",
+    "total_distance_milli",
+    "remaining_distance_milli",
+    "speed_multiplier_num",
+    "speed_multiplier_den",
+    "life_support_eligible"
+  ],
+  "$defs": {
+    "ArcDirection": {
+      "description": "Direction along a lane arc.",
+      "type": "string",
+      "enum": [
+        "clockwise",
+        "counterClockwise"
+      ]
+    },
+    "LaneId": {
+      "description": "Orbital lane identifiers in increasing orbital radius order.",
+      "type": "string",
+      "enum": [
+        "inner",
+        "habitable",
+        "outer",
+        "fringe"
+      ]
+    },
+    "TravelSegmentKind": {
+      "description": "Kind of a single travel segment.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "radialBurn"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "laneArc"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    }
+  }
+}

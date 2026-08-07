@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ServerStatus",
+  "description": "Runtime status published by the actor for query endpoints.",
+  "type": "object",
+  "properties": {
+    "content_version": {
+      "description": "Content version string of the loaded game.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "game_state": {
+      "description": "Current game lifecycle state.",
+      "$ref": "#/$defs/GameLifecycle"
+    },
+    "latest_event_sequence": {
+      "description": "The latest event sequence number.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "loading": {
+      "description": "Loading progress during the Loading lifecycle.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LoadingStatus"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "protocol_version": {
+      "description": "Protocol version string.",
+      "type": "string"
+    },
+    "schema_version": {
+      "description": "Schema version of the loaded game state.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0
+    },
+    "server": {
+      "description": "Server readiness indicator.",
+      "type": "string"
+    },
+    "tick": {
+      "description": "Current simulation tick, if a game is loaded.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "protocol_version",
+    "server",
+    "game_state",
+    "latest_event_sequence"
+  ],
+  "$defs": {
+    "GameLifecycle": {
+      "description": "Lifecycle states of the game session.",
+      "oneOf": [
+        {
+          "description": "No game is loaded; actor has no mutable state.",
+          "type": "string",
+          "const": "unloaded"
+        },
+        {
+          "description": "A load or new-game operation is in progress; state is not yet available.",
+          "type": "string",
+          "const": "loading"
+        },
+        {
+          "description": "Game is loaded but paused; commands and batch ticks are accepted.",
+          "type": "string",
+          "const": "paused"
+        },
+        {
+          "description": "Game is running with real-time scheduler ticks; commands and pause are accepted.",
+          "type": "string",
+          "const": "running"
+        },
+        {
+          "description": "A batch of ticks is being advanced; no commands or scheduler ticks are accepted.",
+          "type": "string",
+          "const": "advancing"
+        },
+        {
+          "description": "Gate victory has been achieved; no further mutation is possible.",
+          "type": "string",
+          "const": "won"
+        }
+      ]
+    },
+    "LoadingOperation": {
+      "description": "The operation being performed during Loading.",
+      "oneOf": [
+        {
+          "description": "Constructing a new game from a scenario.",
+          "type": "string",
+          "const": "NewGame"
+        },
+        {
+          "description": "Loading a saved game from disk.",
+          "type": "string",
+          "const": "LoadAutosave"
+        },
+        {
+          "description": "Initial autoload at server startup.",
+          "type": "string",
+          "const": "StartupAutoload"
+        }
+      ]
+    },
+    "LoadingStage": {
+      "description": "The stage within a loading operation.",
+      "oneOf": [
+        {
+          "description": "Validating content definitions.",
+          "type": "string",
+          "const": "ValidatingContent"
+        },
+        {
+          "description": "Constructing starting scenario state.",
+          "type": "string",
+          "const": "ConstructingScenario"
+        },
+        {
+          "description": "Reading save file from disk.",
+          "type": "string",
+          "const": "ReadingSave"
+        },
+        {
+          "description": "Verifying save envelope integrity.",
+          "type": "string",
+          "const": "VerifyingEnvelope"
+        },
+        {
+          "description": "Running schema migrations.",
+          "type": "string",
+          "const": "Migrating"
+        },
+        {
+          "description": "Validating deserialized state invariants.",
+          "type": "string",
+          "const": "ValidatingState"
+        },
+        {
+          "description": "Publishing the new state and transitioning lifecycle.",
+          "type": "string",
+          "const": "Publishing"
+        }
+      ]
+    },
+    "LoadingStatus": {
+      "description": "Progress reported during the Loading lifecycle.",
+      "type": "object",
+      "properties": {
+        "operation": {
+          "description": "The loading operation being performed.",
+          "$ref": "#/$defs/LoadingOperation"
+        },
+        "stage": {
+          "description": "The current stage within the loading operation.",
+          "$ref": "#/$defs/LoadingStage"
+        }
+      },
+      "required": [
+        "operation",
+        "stage"
+      ]
+    }
+  }
+}

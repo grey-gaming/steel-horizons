@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Buffer",
+  "description": "A single resource buffer with thresholds.",
+  "type": "object",
+  "properties": {
+    "current": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "demand_threshold": {
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
+    },
+    "export_threshold": {
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
+    },
+    "max": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "resource": {
+      "$ref": "#/$defs/ResourceType"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "resource",
+    "current",
+    "max",
+    "demand_threshold",
+    "export_threshold"
+  ],
+  "$defs": {
+    "ResourceType": {
+      "description": "The 25 resource types in canonical order (raw, refined, component).\n\nSerialized as a camelCase string (e.g. `\"metalOre\"`).  This enum's\n`Ord` follows the GDD 14 resource catalog order so that sparse maps\niterate deterministically.",
+      "type": "string",
+      "enum": [
+        "metalOre",
+        "carbonSoil",
+        "siliconDust",
+        "volcanicSulfur",
+        "waterIce",
+        "frozenGases",
+        "helium3",
+        "rareEarthMinerals",
+        "crystalDeposits",
+        "metals",
+        "carbonFiber",
+        "siliconWafers",
+        "chemicals",
+        "fuel",
+        "alloys",
+        "optics",
+        "reactorRods",
+        "structuralFrame",
+        "powerCore",
+        "controlSystem",
+        "driveAssembly",
+        "cargoModule",
+        "researchLab",
+        "constructionBay",
+        "gateNode"
+      ]
+    }
+  }
+}
