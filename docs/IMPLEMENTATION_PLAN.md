@@ -755,7 +755,7 @@ Notes: New module `engine/src/persistence.rs` (~1,000 lines). SaveEnvelope V1 wi
 ```text
 Increment: P1-14
 Date: 2026-08-06
-Commit: e61938c
+Commit: ddf1b75 (primary) / e61938c (base)
 Requirements: ADR-0003 §Local Security, §Connection and Authentication, §Backpressure and Limits; TDD 02 §Connection and Authentication, §Backpressure and Limits; ADR-0004 §Game Lifecycle State Machine
 Focused proof: `cargo test --lib` — 339 tests including 7 API integration tests (status, state unavailable, content, auth required, collection unavailable, command newgame, 404 error envelope). Server spawns with real content catalog, actor, and router on random loopback port; tests exercise discovery-like status, Bearer auth with missing/bad/correct tokens, GameUnavailable before load, content catalog retrieval, collection query (503 before load), command envelope acceptance (NewGame accepted → applied), and 404 error envelope format.
 Cumulative gates: `cargo fmt` (clean), `cargo build` (clean), `cargo clippy --no-deps` (clean), `cargo test --lib` (339/339 pass), `scripts/schema-export.sh` (37 schemas)
