@@ -14,16 +14,15 @@ Endpoints
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, cast
 
 import httpx
 
 __all__ = ["SteelHorizonsClient", "read_discovery_file"]
 
 
-def read_discovery_file(user_data_dir: Path) -> Dict[str, Any]:
+def read_discovery_file(user_data_dir: Path) -> dict[str, Any]:
     """Read the connection discovery file written by the engine.
 
     Parameters
@@ -39,7 +38,7 @@ def read_discovery_file(user_data_dir: Path) -> Dict[str, Any]:
     """
     path = user_data_dir / "connection.json"
     with open(path, "r") as f:
-        return json.load(f)
+        return cast(dict[str, Any], json.load(f))
 
 
 class SteelHorizonsClient:
@@ -54,7 +53,7 @@ class SteelHorizonsClient:
     # ── Factory: construct from discovery file ────────────────────────
 
     @classmethod
-    def from_discovery(cls, user_data_dir: Optional[Path] = None) -> "SteelHorizonsClient":
+    def from_discovery(cls, user_data_dir: Path | None = None) -> SteelHorizonsClient:
         """Read the discovery file and return a client configured for that session."""
         if user_data_dir is None:
             import platformdirs
@@ -68,46 +67,46 @@ class SteelHorizonsClient:
 
     # ── HTTP helpers ──────────────────────────────────────────────────
 
-    def _get(self, path: str) -> Dict[str, Any]:
+    def _get(self, path: str) -> dict[str, Any]:
         r = httpx.get(f"{self._base}{path}", headers=self._headers)
         r.raise_for_status()
-        return r.json()
+        return cast(dict[str, Any], r.json())
 
-    def _post(self, path: str, body: Dict[str, Any]) -> Dict[str, Any]:
+    def _post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
         r = httpx.post(
             f"{self._base}{path}",
             headers=self._headers,
             content=json.dumps(body),
         )
         r.raise_for_status()
-        return r.json()
+        return cast(dict[str, Any], r.json())
 
     # ── API methods ───────────────────────────────────────────────────
 
-    def status(self) -> Dict[str, Any]:
+    def status(self) -> dict[str, Any]:
         """GET /api/v1/status — server status."""
         return self._get("/api/v1/status")
 
-    def state(self) -> Dict[str, Any]:
+    def state(self) -> dict[str, Any]:
         """GET /api/v1/state — full game state snapshot."""
         return self._get("/api/v1/state")
 
-    def content(self) -> Dict[str, Any]:
+    def content(self) -> dict[str, Any]:
         """GET /api/v1/content — content catalog."""
         return self._get("/api/v1/content")
 
-    def collection(self, name: str) -> Dict[str, Any]:
+    def collection(self, name: str) -> dict[str, Any]:
         """GET /api/v1/state/{name} — collection query.
 
         Valid names: ``ships``, ``stations``, ``celestial_bodies``, ``research``, ``build-orders``.
         """
         return self._get(f"/api/v1/state/{name}")
 
-    def entity(self, collection: str, entity_id: str) -> Dict[str, Any]:
+    def entity(self, collection: str, entity_id: str) -> dict[str, Any]:
         """GET /api/v1/state/{collection}/{id} — single entity lookup."""
         return self._get(f"/api/v1/state/{collection}/{entity_id}")
 
-    def command(self, envelope: Dict[str, Any]) -> Dict[str, Any]:
+    def command(self, envelope: dict[str, Any]) -> dict[str, Any]:
         """POST /api/v1/command — submit a command envelope.
 
         Parameters

@@ -168,6 +168,35 @@ pub struct SessionReceipt {
     pub envelope_hash: u64,
 }
 
+/// Typed error for merging a loaded receipt ledger into the live session
+/// ledger (ADR-0008 §5 collision rejection).
+#[derive(Debug)]
+pub enum ReceiptMergeError {
+    /// An existing tombstone and a loaded receipt share an id but differ in
+    /// envelope fingerprint.
+    FingerprintConflict(String),
+    /// An existing tombstone and a loaded receipt share an id but differ in
+    /// server sequence.
+    SequenceConflict(String),
+}
+
+impl std::fmt::Display for ReceiptMergeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ReceiptMergeError::FingerprintConflict(id) => write!(
+                f,
+                "ambiguous receipt collision for id '{id}': envelope fingerprint differs"
+            ),
+            ReceiptMergeError::SequenceConflict(id) => write!(
+                f,
+                "ambiguous receipt collision for id '{id}': server_sequence differs"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for ReceiptMergeError {}
+
 /// A stored event (placeholder — full event store in P1-31).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StoredEvent {
@@ -272,20 +301,14 @@ impl SimulationActor {
 
     /// Run the actor event loop, processing messages until shutdown.
     pub async fn run(&mut self) {
-        while !self.shutdown_requested {
-            tokio::select! {
-                msg = self.mailbox_rx.recv() => {
-                    match msg {
-                        Some(msg) => {
-                            self.process_message(msg);
-                        }
-                        None => {
-                            // All senders dropped — shut down.
-                            break;
-                        }
-                    }
-                }
+        // Drain the mailbox. `recv()` returns None once every sender has been
+        // dropped, which also ends the loop; an explicit shutdown flag breaks
+        // out first so a drained mailbox can't keep processing after shutdown.
+        while let Some(msg) = self.mailbox_rx.recv().await {
+            if self.shutdown_requested {
+                break;
             }
+            self.process_message(msg);
         }
     }
 
@@ -462,7 +485,7 @@ impl SimulationActor {
         let effective_tick: Option<u64>;
         let mut resulting_tick: Option<u64>;
         let mut status: CommandStatus;
-        let result: Option<CommandResult>;
+        let mut result: Option<CommandResult>;
         let mut error: Option<CommandRejection>;
 
         // Control commands are allowed from any lifecycle (they've already
@@ -542,18 +565,31 @@ impl SimulationActor {
 
         if is_immediate && status != CommandStatus::Rejected {
             match &envelope.command {
-                crate::command::Command::NewGame { .. } => {
+                crate::command::Command::NewGame { scenario_id } => {
                     // ADR-0004: NewGame -> Loading -> Paused/Won.  The load
                     // completes synchronously; a failure surfaces as a Failed
                     // acknowledgement rather than leaving the actor Loading.
-                    let load = self.handle_load_game(LoadingOperation::NewGame);
-                    if let Some(e) = load.error {
-                        status = CommandStatus::Failed;
+                    // V1 authors exactly one scenario, so the wire scenario_id
+                    // must match it — reject unknown ids instead of silently
+                    // ignoring them (a future footgun once a second scenario
+                    // exists).
+                    if *scenario_id != self.content.starting_system.id {
+                        status = CommandStatus::Rejected;
                         error = Some(CommandRejection {
-                            code: "CommandFailed".to_string(),
-                            message: e,
+                            code: "UnknownScenario".to_string(),
+                            message: format!("unknown scenario '{}'", scenario_id.as_str()),
                             details: BTreeMap::new(),
                         });
+                    } else {
+                        let load = self.handle_load_game(LoadingOperation::NewGame);
+                        if let Some(e) = load.error {
+                            status = CommandStatus::Failed;
+                            error = Some(CommandRejection {
+                                code: "CommandFailed".to_string(),
+                                message: e,
+                                details: BTreeMap::new(),
+                            });
+                        }
                     }
                 }
                 crate::command::Command::SaveNow => {
@@ -565,13 +601,12 @@ impl SimulationActor {
                             // Compute content hash from the catalog; a failure aborts
                             // the save — never persist a corrupt envelope (ADR-0006
                             // §5-7), and never fall back to a dummy hash.
-                            let content_hash: Result<String, String> =
+                            let content_hash: crate::content_hash::ContentHashResult<String> =
                                 crate::content_hash::compute_content_hash(&self.content)
-                                    .map(|h| crate::content_hash::format_hash(&h))
-                                    .map_err(|e| format!("content hash failed: {e}"));
+                                    .map(|h| crate::content_hash::format_hash(&h));
 
                             match content_hash {
-                                Err(e) => Some(e),
+                                Err(e) => Some(format!("content hash failed: {e}")),
                                 Ok(hash) => {
                                     let content_version =
                                         &self.content.starting_system.content_version;
@@ -645,9 +680,24 @@ impl SimulationActor {
                     }
                 }
                 crate::command::Command::AdvanceTicks { count } => {
-                    let _ = count;
-                    self.lifecycle = GameLifecycle::Advancing;
-                    self.update_status();
+                    // Route through the same handler as the ActorMessage path
+                    // (ADR-0008 §4: AdvanceTicks applies immediately while Paused
+                    // and the lifecycle returns to Paused).  The previous stub left
+                    // the actor in Advancing indefinitely — the wire command was
+                    // never actually applied to state.
+                    let res = self.handle_advance_ticks(*count);
+                    status = CommandStatus::Applied;
+                    result = Some(CommandResult::AdvanceTicksCompleted {
+                        resulting_tick: res.resulting_tick,
+                    });
+                    if let Some(e) = res.error {
+                        status = CommandStatus::Failed;
+                        error = Some(CommandRejection {
+                            code: "CommandFailed".to_string(),
+                            message: format!("{e}"),
+                            details: BTreeMap::new(),
+                        });
+                    }
                 }
                 _ => {
                     // Gameplay commands while Paused — apply to state immediately.
@@ -768,8 +818,10 @@ impl SimulationActor {
     ///
     /// Transitions to Advancing, executes N ordinary ticks, then returns to
     /// Paused.  On error, stops at the last successfully committed tick and
-    /// returns to Paused.
-    fn handle_advance_ticks(&mut self, count: u16) -> AdvanceTicksResult {
+    /// returns to Paused.  The ActorMessage path routes here, so realtime/
+    /// batch equivalence holds; made `pub(crate)` so API tests can verify the
+    /// wire path against this canonical handler.
+    pub(crate) fn handle_advance_ticks(&mut self, count: u16) -> AdvanceTicksResult {
         let start_tick = self.state.as_ref().map_or(0, |s| s.tick);
 
         // Validate lifecycle — must be Paused.
@@ -818,15 +870,17 @@ impl SimulationActor {
             }
         }
 
-        // Publish the final snapshot after batch advancement
-        // (publish_snapshot already calls update_status internally).
-        self.publish_snapshot();
-
-        // Return to Paused.
+        // Return to Paused before publishing, so the published snapshot
+        // reflects the final Paused lifecycle (the previous ordering published
+        // an Advancing snapshot — a stale snapshot surfaced by the wire path).
         self.lifecycle = GameLifecycle::Paused;
         if let Some(ref mut state) = self.state {
             state.lifecycle = GameLifecycle::Paused;
         }
+
+        // Publish the final snapshot after batch advancement
+        // (publish_snapshot already calls update_status internally).
+        self.publish_snapshot();
 
         let resulting_tick = self.state.as_ref().map_or(start_tick, |s| s.tick);
 
@@ -839,11 +893,28 @@ impl SimulationActor {
 
     // ─── Handle load game ──────────────────────────────────────────────
 
+    /// Immutable access to the current simulation state (test harness only;
+    /// production mutation remains actor-owned).
+    #[cfg(test)]
+    pub(crate) fn current_state(&self) -> Option<&GameState> {
+        self.state.as_ref()
+    }
+
+    /// Current runtime lifecycle.
+    #[cfg(test)]
+    pub(crate) fn current_lifecycle(&self) -> GameLifecycle {
+        self.lifecycle
+    }
+
     /// Handle NewGame or LoadAutosave lifecycle commands.
     ///
-    /// This is a placeholder that constructs a new game state or returns
-    /// an error.  Real persistence integration lands in P1-13.
-    fn handle_load_game(&mut self, operation: LoadingOperation) -> LoadGameResult {
+    /// Both operations transition the actor through Loading, then either
+    /// publish a Paused state (NewGame constructs the canonical starting
+    /// state; LoadAutosave restores a persisted envelope after content-hash,
+    /// invariant, and command-log validation) or restore the prior state on
+    /// failure and surface a typed load error.  Made `pub(crate)` so API tests
+    /// can drive the same handler the ActorMessage path uses.
+    pub(crate) fn handle_load_game(&mut self, operation: LoadingOperation) -> LoadGameResult {
         let prior_lifecycle = self.lifecycle;
         let prior_state = self.state.take();
 
@@ -899,11 +970,25 @@ impl SimulationActor {
                     let envelope = crate::persistence::read_save_envelope(autosave_path);
                     match envelope {
                         Ok(envelope) => {
-                            // Validate content compatibility
+                            // Validate content compatibility. A content-hash
+                            // failure aborts the load — never substitute a
+                            // dummy hash (matches the SaveNow policy), so the
+                            // typed error surfaces as a load failure.
                             let computed_hash =
-                                crate::content_hash::compute_content_hash(&self.content)
-                                    .map(|h| crate::content_hash::format_hash(&h))
-                                    .unwrap_or_else(|_| "unknown".to_string());
+                                match crate::content_hash::compute_content_hash(&self.content) {
+                                    Ok(h) => crate::content_hash::format_hash(&h),
+                                    Err(e) => {
+                                        self.state = prior_state;
+                                        self.lifecycle = prior_lifecycle;
+                                        self.loading = None;
+                                        self.update_status();
+                                        return LoadGameResult {
+                                            lifecycle: prior_lifecycle,
+                                            tick: 0,
+                                            error: Some(format!("content hash failed: {e}")),
+                                        };
+                                    }
+                                };
                             let content_version = &self.content.starting_system.content_version;
 
                             // Validate envelope against content and compute
@@ -952,7 +1037,7 @@ impl SimulationActor {
                                         return LoadGameResult {
                                             lifecycle: prior_lifecycle,
                                             tick: 0,
-                                            error: Some(e),
+                                            error: Some(format!("{e}")),
                                         };
                                     }
 
@@ -1035,7 +1120,7 @@ impl SimulationActor {
     fn merge_loaded_receipts(
         &mut self,
         loaded: &std::collections::BTreeMap<String, SessionReceipt>,
-    ) -> Result<(), String> {
+    ) -> Result<(), ReceiptMergeError> {
         let mut merged: std::collections::BTreeMap<String, SessionReceipt> =
             std::collections::BTreeMap::new();
 
@@ -1048,14 +1133,10 @@ impl SimulationActor {
                 }
                 Some(loaded_rec) => {
                     if loaded_rec.envelope_hash != existing.envelope_hash {
-                        return Err(format!(
-                            "ambiguous receipt collision for id '{id}': envelope fingerprint differs"
-                        ));
+                        return Err(ReceiptMergeError::FingerprintConflict(id.clone()));
                     }
                     if loaded_rec.server_sequence != existing.server_sequence {
-                        return Err(format!(
-                            "ambiguous receipt collision for id '{id}': server_sequence differs"
-                        ));
+                        return Err(ReceiptMergeError::SequenceConflict(id.clone()));
                     }
                     // Identical envelope + sequence — the loaded record is
                     // authoritative (replaces outcome/effective tick).

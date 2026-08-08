@@ -11,3 +11,14 @@ dependencies = [
     "httpx >= 0.28",
     "platformdirs >= 4.0",
 ]
+
+[tool.ruff]
+line-length = 100
+
+[tool.mypy]
+strict = true
+disallow_untyped_defs = true
+ignore_missing_imports = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

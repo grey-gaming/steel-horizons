@@ -145,12 +145,74 @@ impl fmt::Display for SaveError {
 
 // ─── Schema migration framework ────────────────────────────────────────
 
+/// Typed error for the schema-migration framework (ADR-0007 §6).
+#[derive(Debug)]
+pub enum MigrationError {
+    /// A migration step registered is not adjacent (to != from + 1).
+    NotAdjacent { from: u32, to: u32 },
+    /// Two migrations share a starting version.
+    DuplicateFrom(u32),
+    /// No migrations are expected at schema v1.
+    UnexpectedMigration(u32),
+    /// The chain's next step does not start at the expected version.
+    ChainMismatch { expected: u32, found: u32 },
+    /// A chain step is not adjacent.
+    NotAdjacentChain { from: u32, to: u32 },
+    /// The chain ends before reaching the current schema version.
+    ChainEnds { ends: u32, current: u32 },
+    /// A saved save is newer than the current schema version.
+    FutureVersion { saved: u32, current: u32 },
+    /// The migration chain stopped before the target version.
+    StoppedAt { stopped: u32, target: u32 },
+}
+
+impl std::fmt::Display for MigrationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MigrationError::NotAdjacent { from, to } => write!(
+                f,
+                "migration {} -> {} is not adjacent (to != from + 1)",
+                from, to
+            ),
+            MigrationError::DuplicateFrom(from) => {
+                write!(f, "duplicate migration from version {}", from)
+            }
+            MigrationError::UnexpectedMigration(v) => {
+                write!(f, "no migrations expected at schema v{}", v)
+            }
+            MigrationError::ChainMismatch { expected, found } => write!(
+                f,
+                "expected migration from {} but found from {}",
+                expected, found
+            ),
+            MigrationError::NotAdjacentChain { from, to } => {
+                write!(f, "migration {} -> {} is not adjacent", from, to)
+            }
+            MigrationError::ChainEnds { ends, current } => write!(
+                f,
+                "migration chain ends at {} but current version is {}",
+                ends, current
+            ),
+            MigrationError::FutureVersion { saved, current } => {
+                write!(f, "saved schema version {} > current {}", saved, current)
+            }
+            MigrationError::StoppedAt { stopped, target } => write!(
+                f,
+                "migration stopped at {} but target is {}",
+                stopped, target
+            ),
+        }
+    }
+}
+
+impl std::error::Error for MigrationError {}
+
 /// A single schema migration step (ADR-0007 §6).
 #[allow(clippy::wrong_self_convention)]
 pub trait Migration: Send + Sync {
     fn from_version(&self) -> u32;
     fn to_version(&self) -> u32;
-    fn migrate(&self, state: Value) -> Result<Value, String>;
+    fn migrate(&self, state: Value) -> Result<Value, MigrationError>;
 }
 
 /// Registry that validates a contiguous migration chain.
@@ -174,19 +236,16 @@ impl MigrationRegistry {
     }
 
     /// Register a migration.  Validates adjacency and no duplicates.
-    pub fn register(&mut self, migration: Box<dyn Migration>) -> Result<(), String> {
+    pub fn register(&mut self, migration: Box<dyn Migration>) -> Result<(), MigrationError> {
         let from = migration.from_version();
         let to = migration.to_version();
         if to != from + 1 {
-            return Err(format!(
-                "migration {} -> {} is not adjacent (to != from + 1)",
-                from, to
-            ));
+            return Err(MigrationError::NotAdjacent { from, to });
         }
         // Check for duplicate from_version
         for m in &self.migrations {
             if m.from_version() == from {
-                return Err(format!("duplicate migration from version {}", from));
+                return Err(MigrationError::DuplicateFrom(from));
             }
         }
         self.migrations.push(migration);
@@ -195,11 +254,13 @@ impl MigrationRegistry {
 
     /// Validate that every version from 1 to `current_schema_version` has
     /// exactly one migration step.
-    pub fn validate_chain(&self) -> Result<(), String> {
+    pub fn validate_chain(&self) -> Result<(), MigrationError> {
         if self.current_schema_version == 1 {
             // Schema v1 needs no migrations — chain is trivially valid.
             if !self.migrations.is_empty() {
-                return Err("no migrations expected at schema v1".to_string());
+                return Err(MigrationError::UnexpectedMigration(
+                    self.current_schema_version,
+                ));
             }
             return Ok(());
         }
@@ -213,28 +274,31 @@ impl MigrationRegistry {
         let mut expected = 1u32;
         for (from, to) in &map {
             if *from != expected {
-                return Err(format!(
-                    "expected migration from {} but found from {}",
-                    expected, *from
-                ));
+                return Err(MigrationError::ChainMismatch {
+                    expected,
+                    found: *from,
+                });
             }
             if *to != *from + 1 {
-                return Err(format!("migration {} -> {} is not adjacent", *from, *to));
+                return Err(MigrationError::NotAdjacentChain {
+                    from: *from,
+                    to: *to,
+                });
             }
             expected = *to;
         }
         if expected != self.current_schema_version {
-            return Err(format!(
-                "migration chain ends at {} but current version is {}",
-                expected, self.current_schema_version
-            ));
+            return Err(MigrationError::ChainEnds {
+                ends: expected,
+                current: self.current_schema_version,
+            });
         }
         Ok(())
     }
 
     /// Run the migration chain on a raw JSON value to reach
     /// `current_schema_version`.  Returns the migrated value.
-    pub fn migrate(&self, mut state: Value) -> Result<Value, String> {
+    pub fn migrate(&self, mut state: Value) -> Result<Value, MigrationError> {
         // Read initial schema_version from the value
         let initial_version = state
             .as_object()
@@ -246,10 +310,10 @@ impl MigrationRegistry {
             return Ok(state);
         }
         if initial_version > self.current_schema_version {
-            return Err(format!(
-                "saved schema version {} > current {}",
-                initial_version, self.current_schema_version
-            ));
+            return Err(MigrationError::FutureVersion {
+                saved: initial_version,
+                current: self.current_schema_version,
+            });
         }
 
         // Apply migrations in order
@@ -262,10 +326,10 @@ impl MigrationRegistry {
         }
 
         if current_version != self.current_schema_version {
-            return Err(format!(
-                "migration stopped at {} but target is {}",
-                current_version, self.current_schema_version
-            ));
+            return Err(MigrationError::StoppedAt {
+                stopped: current_version,
+                target: self.current_schema_version,
+            });
         }
         Ok(state)
     }
@@ -743,7 +807,10 @@ pub fn rebuild_pending_from_log(
 /// Seed session receipts from a loaded command log.
 pub fn seed_receipts_from_log(
     state: &GameState,
-) -> Result<std::collections::BTreeMap<String, crate::actor::SessionReceipt>, String> {
+) -> Result<
+    std::collections::BTreeMap<String, crate::actor::SessionReceipt>,
+    crate::command::FingerprintError,
+> {
     use crate::actor::SessionReceipt;
     use crate::command::CommandStatus;
 
@@ -1033,7 +1100,7 @@ mod tests {
         fn to_version(&self) -> u32 {
             self.to
         }
-        fn migrate(&self, state: Value) -> Result<Value, String> {
+        fn migrate(&self, state: Value) -> Result<Value, MigrationError> {
             Ok(state)
         }
     }

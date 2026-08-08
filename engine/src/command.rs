@@ -373,13 +373,42 @@ pub struct CommandEnvelope {
 ///
 /// Returns a typed error on serialization failure; it can only fail for an
 /// envelope that contains a non-canonical value (never for a valid envelope).
-pub fn envelope_canonical_hash(envelope: &CommandEnvelope) -> Result<u64, String> {
+/// Typed error for envelope fingerprinting (ADR-0006 §Idempotency).
+#[derive(Debug)]
+pub enum FingerprintError {
+    /// serde_json serialization of the envelope failed.
+    Serialization(String),
+    /// canonical serialization of the envelope failed.
+    Canonical(String),
+    /// the digest could not be truncated to 8 bytes.
+    DigestTooShort,
+}
+
+impl std::fmt::Display for FingerprintError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FingerprintError::Serialization(msg) => write!(f, "envelope to_value: {msg}"),
+            FingerprintError::Canonical(msg) => write!(f, "envelope canonical bytes: {msg}"),
+            FingerprintError::DigestTooShort => write!(f, "digest too short"),
+        }
+    }
+}
+
+impl std::error::Error for FingerprintError {}
+
+/// Compute a deterministic fingerprint for a command envelope.
+///
+/// Canonical JSON digest (ADR-0006 §Idempotency) used as the idempotency key:
+/// two identical envelopes always hash identically, independent of field order
+/// or representation.
+pub fn envelope_canonical_hash(envelope: &CommandEnvelope) -> Result<u64, FingerprintError> {
     use sha2::{Digest, Sha256};
     const DOMAIN: &[u8] = b"steel-horizons/envelope/sha256-canonical-json-v1";
 
-    let value = serde_json::to_value(envelope).map_err(|e| format!("envelope to_value: {e}"))?;
+    let value = serde_json::to_value(envelope)
+        .map_err(|e| FingerprintError::Serialization(e.to_string()))?;
     let bytes = crate::canonical::to_canonical_bytes(&value)
-        .map_err(|e| format!("envelope canonical bytes: {e}"))?;
+        .map_err(|e| FingerprintError::Canonical(e.to_string()))?;
 
     let mut hasher = Sha256::new();
     hasher.update(DOMAIN);
@@ -392,7 +421,7 @@ pub fn envelope_canonical_hash(envelope: &CommandEnvelope) -> Result<u64, String
     Ok(u64::from_le_bytes(
         digest[0..8]
             .try_into()
-            .map_err(|_| "digest too short".to_string())?,
+            .map_err(|_| FingerprintError::DigestTooShort)?,
     ))
 }
 

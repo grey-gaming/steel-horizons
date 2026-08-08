@@ -675,7 +675,7 @@ mod tests {
             "id": "test-cmd-001",
             "command": {
                 "type": "newGame",
-                "scenario_id": "default"
+                "scenario_id": "starting_system"
             }
         });
         let resp = client
@@ -726,6 +726,265 @@ mod tests {
             canonical_golden_hash,
             "post-NewGame state must equal the canonical golden state hash"
         );
+
+        server.abort();
+        actor_handle.abort();
+    }
+
+    /// Test POST /api/v1/command — AdvanceTicks while Paused applies
+    /// immediately and the served state-hash equals a batch run through the
+    /// ActorMessage path (realtime_batch_equivalence extended to the wire path,
+    /// review-fix F1).
+    #[tokio::test]
+    async fn test_command_advance_ticks() {
+        let catalog = load_test_content();
+
+        // Reference state-hash: build a fresh actor and run NewGame then
+        // handle_advance_ticks(10) directly (the ActorMessage batch path).
+        let (mut ref_actor, _, _, _) = crate::actor::SimulationActor::new(catalog.clone());
+        ref_actor.handle_load_game(crate::lifecycle::LoadingOperation::NewGame);
+        let res = ref_actor.handle_advance_ticks(10);
+        assert!(
+            res.error.is_none(),
+            "batch advance must succeed: {:?}",
+            res.error
+        );
+        assert_eq!(res.ticks_advanced, 10);
+        assert_eq!(res.resulting_tick, 10);
+        assert_eq!(
+            ref_actor.current_lifecycle(),
+            crate::types::GameLifecycle::Paused
+        );
+        let reference_hash = crate::state_hash::format_state_hash(
+            &crate::state_hash::compute_state_hash(ref_actor.current_state().unwrap()).unwrap(),
+        );
+
+        // Wire: spawn actor + server.
+        let (mut actor, mailbox_tx, snapshot_rx, status_rx) =
+            crate::actor::SimulationActor::new(catalog);
+        let state = AppState {
+            mailbox_tx,
+            snapshot_rx,
+            status_rx,
+            token: String::new(),
+            content: actor.content.clone(),
+        };
+        let router = build_router(state);
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            axum::serve(listener, router).await.unwrap();
+        });
+        let actor_handle = tokio::spawn(async move {
+            actor.run().await;
+        });
+
+        let client = reqwest::Client::new();
+        wait_ready(&client, &addr).await;
+
+        // NewGame first to reach Paused at tick 0.
+        let newgame = serde_json::json!({
+            "id": "test-cmd-adv-000",
+            "command": { "type": "newGame", "scenario_id": "starting_system" }
+        });
+        let resp = client
+            .post(format!("http://{}/api/v1/command", addr))
+            .header("Content-Type", "application/json")
+            .body(newgame.to_string())
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        // AdvanceTicks count=10 while Paused.
+        let envelope = serde_json::json!({
+            "id": "test-cmd-adv-001",
+            "command": { "type": "advanceTicks", "count": 10 }
+        });
+        let resp = client
+            .post(format!("http://{}/api/v1/command", addr))
+            .header("Content-Type", "application/json")
+            .body(envelope.to_string())
+            .send()
+            .await
+            .unwrap();
+        let status = resp.status();
+        let body_text = resp.text().await.unwrap_or_default();
+        assert_eq!(
+            status,
+            StatusCode::OK,
+            "expected 200, got {}: {}",
+            status,
+            body_text
+        );
+        let body: Value =
+            serde_json::from_str(&body_text).expect("command response must be valid JSON");
+        assert_eq!(body["status"], "applied");
+        assert_eq!(body["result"]["type"], "advanceTicksCompleted");
+        assert_eq!(body["result"]["resulting_tick"], 10);
+        assert_eq!(body["game_state"], "paused");
+
+        // Served state must be Paused at tick 10 and equal the reference hash.
+        let state_resp = client
+            .get(format!("http://{}/api/v1/state", addr))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(state_resp.status(), StatusCode::OK);
+        let state_body: Value =
+            serde_json::from_str(&state_resp.text().await.unwrap_or_default()).unwrap();
+        assert_eq!(
+            state_body["state"]["lifecycle"], "paused",
+            "post-advanceTicks lifecycle must be paused"
+        );
+        assert_eq!(state_body["state"]["tick"], 10);
+        let served: crate::state::GameState =
+            serde_json::from_value(state_body["state"].clone()).unwrap();
+        let served_hash = crate::state_hash::compute_state_hash(&served).unwrap();
+        assert_eq!(
+            crate::state_hash::format_state_hash(&served_hash),
+            reference_hash,
+            "wire advanceTicks must equal the ActorMessage batch path (realtime_batch_equivalence)"
+        );
+
+        server.abort();
+        actor_handle.abort();
+    }
+
+    /// Test POST /api/v1/command — AdvanceTicks posted while Running is
+    /// rejected at the wire level (review-fix F1).
+    #[tokio::test]
+    async fn test_command_advance_ticks_rejected_when_running() {
+        let catalog = load_test_content();
+        let (mut actor, mailbox_tx, snapshot_rx, status_rx) =
+            crate::actor::SimulationActor::new(catalog);
+        let state = AppState {
+            mailbox_tx,
+            snapshot_rx,
+            status_rx,
+            token: String::new(),
+            content: actor.content.clone(),
+        };
+        let router = build_router(state);
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            axum::serve(listener, router).await.unwrap();
+        });
+        let actor_handle = tokio::spawn(async move {
+            actor.run().await;
+        });
+
+        let client = reqwest::Client::new();
+        wait_ready(&client, &addr).await;
+
+        // NewGame -> Paused, then Resume -> Running.
+        let newgame = serde_json::json!({
+            "id": "test-cmd-adv-r-000",
+            "command": { "type": "newGame", "scenario_id": "starting_system" }
+        });
+        let resp = client
+            .post(format!("http://{}/api/v1/command", addr))
+            .header("Content-Type", "application/json")
+            .body(newgame.to_string())
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let resume = serde_json::json!({
+            "id": "test-cmd-adv-r-001",
+            "command": { "type": "resume" }
+        });
+        let resp = client
+            .post(format!("http://{}/api/v1/command", addr))
+            .header("Content-Type", "application/json")
+            .body(resume.to_string())
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        // AdvanceTicks while Running must be Rejected (409), not applied.
+        let envelope = serde_json::json!({
+            "id": "test-cmd-adv-r-002",
+            "command": { "type": "advanceTicks", "count": 10 }
+        });
+        let resp = client
+            .post(format!("http://{}/api/v1/command", addr))
+            .header("Content-Type", "application/json")
+            .body(envelope.to_string())
+            .send()
+            .await
+            .unwrap();
+        let status = resp.status();
+        let body_text = resp.text().await.unwrap_or_default();
+        assert_eq!(
+            status,
+            StatusCode::CONFLICT,
+            "expected 409, got {}: {}",
+            status,
+            body_text
+        );
+        let body: Value =
+            serde_json::from_str(&body_text).expect("command response must be valid JSON");
+        assert_eq!(body["status"], "rejected");
+        assert_eq!(body["error"]["code"], "InvalidLifecycle");
+
+        server.abort();
+        actor_handle.abort();
+    }
+
+    /// Test POST /api/v1/command — NewGame with an unknown scenario_id is
+    /// rejected rather than silently ignored (review-fix F9).
+    #[tokio::test]
+    async fn test_command_newgame_unknown_scenario_rejected() {
+        let catalog = load_test_content();
+        let (mut actor, mailbox_tx, snapshot_rx, status_rx) =
+            crate::actor::SimulationActor::new(catalog);
+        let state = AppState {
+            mailbox_tx,
+            snapshot_rx,
+            status_rx,
+            token: String::new(),
+            content: actor.content.clone(),
+        };
+        let router = build_router(state);
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            axum::serve(listener, router).await.unwrap();
+        });
+        let actor_handle = tokio::spawn(async move {
+            actor.run().await;
+        });
+
+        let client = reqwest::Client::new();
+        wait_ready(&client, &addr).await;
+
+        let envelope = serde_json::json!({
+            "id": "test-cmd-adv-003",
+            "command": { "type": "newGame", "scenario_id": "nonexistent" }
+        });
+        let resp = client
+            .post(format!("http://{}/api/v1/command", addr))
+            .header("Content-Type", "application/json")
+            .body(envelope.to_string())
+            .send()
+            .await
+            .unwrap();
+        let status = resp.status();
+        let body_text = resp.text().await.unwrap_or_default();
+        assert_eq!(
+            status,
+            StatusCode::CONFLICT,
+            "expected 409, got {}: {}",
+            status,
+            body_text
+        );
+        let body: Value =
+            serde_json::from_str(&body_text).expect("command response must be valid JSON");
+        assert_eq!(body["status"], "rejected");
+        assert_eq!(body["error"]["code"], "UnknownScenario");
 
         server.abort();
         actor_handle.abort();

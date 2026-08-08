@@ -51,16 +51,28 @@ echo "--- Schema export --check ---"
 scripts/schema-export.sh --check
 echo "PASS: committed schemas match generated schemas"
 
-# 6. Python scaffold checks (formatting, typing, unit smoke)
+# 6. Python package checks (formatting, typing, unit smoke) — text-ui + client
 echo "--- Python checks ---"
 python3 -m pip install -q hatchling ruff mypy pytest 2>&1
+
+# text-ui package
 cd text-ui
-python3 -m ruff check src/ 2>&1
-echo "PASS: Python formatting OK"
+python3 -m ruff check src/ tests/ 2>&1
+echo "PASS: text-ui formatting OK"
 python3 -m mypy src/ 2>&1
-echo "PASS: Python typing OK"
-python3 -m pytest --co 2>&1 || echo "INFO: no tests yet — pytest-cov may not be installed"
-echo "PASS: Python scaffold OK"
+echo "PASS: text-ui typing OK"
+python3 -m pytest 2>&1
+echo "PASS: text-ui unit smoke OK"
+cd "$REPO_ROOT"
+
+# generated Python client package (gated with the same lint/type/test layers)
+cd python
+python3 -m ruff check . 2>&1
+echo "PASS: client formatting OK"
+python3 -m mypy steel_horizons_client/ 2>&1
+echo "PASS: client typing OK"
+python3 -m pytest 2>&1
+echo "PASS: client unit smoke OK"
 cd "$REPO_ROOT"
 
 echo ""

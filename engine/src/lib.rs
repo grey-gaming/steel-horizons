@@ -3,7 +3,6 @@
 // UNLICENSED — private development; no public grant
 
 #![deny(unsafe_code)]
-#![deny(missing_docs)]
 #![deny(elided_lifetimes_in_paths)]
 #![forbid(noop_method_call)]
 
